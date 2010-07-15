@@ -1,0 +1,12 @@
+The videoapi mediaserver. We need a better name for it.
+
+Requires libev, librtmp and libavcodec.(The latter is not actually used yet,
+but we link against it anyway.
+
+The makefile will probably have to be modified locally to suit your needs.
+
+$ ./make
+$ ./a.out
+
+Connect with your rtmp client of choice. It establishes the cxn but does
+little else after media packets start coming in.
