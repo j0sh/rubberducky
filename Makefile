@@ -1,5 +1,5 @@
 
-PKGCFG_DEPS=libavcodec librtmp
+PKGCFG_DEPS=librtmp
 DEPS=-lev `pkg-config --cflags --libs $(PKGCFG_DEPS)`
 OPTS=-g
 

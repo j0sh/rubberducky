@@ -10,7 +10,6 @@
 /* lib includes */
 #include <librtmp/rtmp.h>
 #include <librtmp/log.h>
-#include <libavformat/avformat.h>
 #include <ev.h>
 
 /* local includes */
