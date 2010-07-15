@@ -268,7 +268,8 @@ static void incoming_cb(struct ev_loop *loop, ev_io *io, int revents)
 fail:
     fprintf(stderr, "%s", errstr);
     if (clientfd) close(clientfd);
-    free_all(ctx);
+    if (ctx->clients == client)
+        free_client(ctx, client);
 }
 
 static ev_signal signal_watcher_int;
