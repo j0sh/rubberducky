@@ -306,7 +306,6 @@ static void setup_events(srv_ctx *ctx)
 int main(int argc, char** argv)
 {
     int serverfd = 0;
-    int tmp = 1, len;
     const char *errstr;
     srv_ctx *ctx = malloc(sizeof(srv_ctx));
 
