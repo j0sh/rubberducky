@@ -47,7 +47,8 @@ SAVC(publish);
 
 static int send_client_bw(RTMP *rtmp)
 {
-    char pbuf[] = {0, 0, 0, 0};
+    char pbuf[RTMP_MAX_HEADER_SIZE+4];
+    memset(pbuf+RTMP_MAX_HEADER_SIZE, 0, 4);
     RTMPPacket packet = {
         .m_nChannel = 0x02,
         .m_packetType = 0x06, // set peer bandwidth
@@ -55,7 +56,7 @@ static int send_client_bw(RTMP *rtmp)
         .m_nInfoField2 = 0,
         .m_hasAbsTimestamp = 0,
         .m_nBodySize = sizeof(pbuf),
-        .m_body = pbuf
+        .m_body = pbuf+RTMP_MAX_HEADER_SIZE
     };
     return RTMP_SendPacket(rtmp, &packet, FALSE);
 }
@@ -64,7 +65,11 @@ static int send_ping(RTMP *rtmp)
 {
     time_t now = time(NULL);
     // assumes little endian ordering
-    char pbuf[] = { now, now >> 8, now >> 16, now >> 24 };
+    char pbuf[RTMP_MAX_HEADER_SIZE+4];
+    pbuf[RTMP_MAX_HEADER_SIZE+0] = now;
+    pbuf[RTMP_MAX_HEADER_SIZE+1] = now >>  8;
+    pbuf[RTMP_MAX_HEADER_SIZE+2] = now >> 16;
+    pbuf[RTMP_MAX_HEADER_SIZE+3] = now >> 24;
     RTMPPacket packet = {
         .m_nChannel = 0x02,
         .m_packetType = 0x04, // ping
@@ -72,7 +77,7 @@ static int send_ping(RTMP *rtmp)
         .m_nInfoField2 = 0,
         .m_hasAbsTimestamp = 0,
         .m_nBodySize = sizeof(pbuf),
-        .m_body = pbuf
+        .m_body = pbuf+RTMP_MAX_HEADER_SIZE
     };
     return RTMP_SendPacket(rtmp, &packet, FALSE);
 }
@@ -80,12 +85,12 @@ static int send_ping(RTMP *rtmp)
 //XXX figure out just WTF the stream id is used for
 static int send_result(RTMP *rtmp, double txn, double stream_id)
 {
-    char pbuf[128], *end = pbuf+sizeof(pbuf), *enc = pbuf, *foo;
+    char pbuf[128], *end = pbuf+sizeof(pbuf), *enc = pbuf+RTMP_MAX_HEADER_SIZE, *foo;
     enc = AMF_EncodeString(enc, end, &av__result);
     enc = AMF_EncodeNumber(enc, end, txn);
     *enc++ = AMF_NULL; //command object
     enc = AMF_EncodeNumber(enc, end, stream_id);
-    foo = pbuf;
+    foo = pbuf+RTMP_MAX_HEADER_SIZE;
     RTMPPacket packet = {
         .m_nChannel = 0x03,
         .m_packetType = 0x14,
@@ -102,11 +107,11 @@ static int send_onbw_done(RTMP *rtmp)
 {
     // i have never actually seen a flash client make use of this.
     SAVC(onBWDone);
-    char pbuf[128], *end = pbuf+sizeof(pbuf), *enc = pbuf, *foo;
+    char pbuf[128], *end = pbuf+sizeof(pbuf), *enc = pbuf+RTMP_MAX_HEADER_SIZE, *foo;
     enc = AMF_EncodeString(pbuf, end, &av_onBWDone);
     enc = AMF_EncodeNumber(enc, end, 0);
     *enc++ = AMF_NULL; // command object
-    foo = pbuf;
+    foo = pbuf+RTMP_MAX_HEADER_SIZE;
     RTMPPacket packet = {
         .m_nChannel = 0x03,
         .m_packetType = 0x14, // invoke
@@ -133,8 +138,7 @@ static int send_cxn_resp(RTMP *rtmp, double txn)
   packet.m_nTimeStamp = 0;
   packet.m_nInfoField2 = 0;
   packet.m_hasAbsTimestamp = 0;
-  //packet.m_body = pbuf + RTMP_MAX_HEADER_SIZE;
-  packet.m_body = pbuf;
+  packet.m_body = pbuf + RTMP_MAX_HEADER_SIZE;
 
   enc = AMF_EncodeString(pbuf, pend, &av__result);
   enc = AMF_EncodeNumber(enc, pend, txn);
@@ -181,7 +185,7 @@ typedef enum pub_type {publish = 0, unpublish} pub_type;
 static int send_fcpublish(RTMP *rtmp, AVal *streamname,
                           double txn, pub_type action)
 {
-    char pbuf[256], *end = pbuf+sizeof(pbuf), *enc = pbuf, *foo;
+    char pbuf[256], *end = pbuf+sizeof(pbuf), *enc = pbuf+RTMP_MAX_HEADER_SIZE, *foo;
     AVal key, value;
     switch (action) {
     case publish:
@@ -209,7 +213,7 @@ static int send_fcpublish(RTMP *rtmp, AVal *streamname,
     *enc++ = 0;
     *enc++ = AMF_OBJECT_END;
 
-    foo = pbuf;
+    foo = pbuf+RTMP_MAX_HEADER_SIZE;
     RTMPPacket packet = {
         .m_nChannel = 0x03,
         .m_packetType = 0x14,
@@ -225,7 +229,7 @@ static int send_fcpublish(RTMP *rtmp, AVal *streamname,
 
 static int send_onpublish(RTMP *rtmp, AVal *streamname, pub_type action)
 {
-    char pbuf[256], *end = pbuf+sizeof(pbuf), *enc = pbuf, *foo;
+    char pbuf[256], *end = pbuf+sizeof(pbuf), *enc = pbuf+RTMP_MAX_HEADER_SIZE, *foo;
     char tbuf[64], pubstr[64]; //XXX this might not be enough later on
     int tsize;
     AVal key, value;
@@ -269,7 +273,7 @@ static int send_onpublish(RTMP *rtmp, AVal *streamname, pub_type action)
     *enc++ = 0;
     *enc++ = AMF_OBJECT_END;
 
-    foo = pbuf;
+    foo = pbuf+RTMP_MAX_HEADER_SIZE;
     RTMPPacket packet = {
         .m_nChannel = 0x03,
         .m_packetType = 0x14, // invoke
