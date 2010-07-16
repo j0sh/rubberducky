@@ -2,7 +2,8 @@
 PKGCFG_DEPS=librtmp
 DEPS=-lev `pkg-config --cflags --libs $(PKGCFG_DEPS)`
 OPTS=-g
+CC=gcc
 
 default:
-	gcc $(OPTS) $(DEPS) mediaserver.c librtmp.c
+	$(CC) $(OPTS) $(DEPS) mediaserver.c librtmp.c
 
