@@ -140,7 +140,7 @@ static int send_cxn_resp(RTMP *rtmp, double txn)
   packet.m_hasAbsTimestamp = 0;
   packet.m_body = pbuf + RTMP_MAX_HEADER_SIZE;
 
-  enc = AMF_EncodeString(pbuf, pend, &av__result);
+  enc = AMF_EncodeString(packet.m_body, pend, &av__result);
   enc = AMF_EncodeNumber(enc, pend, txn);
   *enc++ = AMF_OBJECT;
 
