@@ -55,7 +55,7 @@ static int send_client_bw(RTMP *rtmp)
         .m_nTimeStamp = 0,
         .m_nInfoField2 = 0,
         .m_hasAbsTimestamp = 0,
-        .m_nBodySize = sizeof(pbuf),
+        .m_nBodySize = sizeof(pbuf) - RTMP_MAX_HEADER_SIZE,
         .m_body = pbuf+RTMP_MAX_HEADER_SIZE
     };
     return RTMP_SendPacket(rtmp, &packet, FALSE);
@@ -76,7 +76,7 @@ static int send_ping(RTMP *rtmp)
         .m_nTimeStamp = 0,
         .m_nInfoField2 = 0,
         .m_hasAbsTimestamp = 0,
-        .m_nBodySize = sizeof(pbuf),
+        .m_nBodySize = sizeof(pbuf) - RTMP_MAX_HEADER_SIZE,
         .m_body = pbuf+RTMP_MAX_HEADER_SIZE
     };
     return RTMP_SendPacket(rtmp, &packet, FALSE);
