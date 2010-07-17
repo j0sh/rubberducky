@@ -231,7 +231,6 @@ static int send_onpublish(RTMP *rtmp, AVal *streamname, pub_type action)
 {
     char pbuf[256], *end = pbuf+sizeof(pbuf), *enc = pbuf+RTMP_MAX_HEADER_SIZE, *foo;
     char tbuf[64], pubstr[64]; //XXX this might not be enough later on
-    int tsize;
     AVal key, value;
     STR2AVAL(value, "onStatus");
     enc = AMF_EncodeString(enc, end, &value);
@@ -239,23 +238,19 @@ static int send_onpublish(RTMP *rtmp, AVal *streamname, pub_type action)
     *enc++ = AMF_NULL; // command object
 
     // TODO checks to enforce string bounds here (and everywhere else)
-    tsize = snprintf(tbuf, sizeof(tbuf),
-                     "%s is now ", streamname->av_val);
     switch(action) {
     case publish:
         strncpy(pubstr, "NetStream.Publish.Start", sizeof(pubstr));
+        snprintf(tbuf, sizeof(tbuf), "%s is now published.", streamname->av_val);
         break;
     case unpublish:
         strncpy(pubstr, "NetStream.Unpublish.Success", sizeof(pubstr));
-        *(tbuf+tsize) = 'u';
-        *(tbuf+tsize+1) = 'n';
-        tsize += 2;
+        snprintf(tbuf, sizeof(tbuf), "%s is now unpublished.", streamname->av_val);
         break;
     default:
         strncpy(pubstr, "oops", sizeof(pubstr));
     }
 
-    strncpy(tbuf+tsize, "published.", 9);
     *enc++ = AMF_OBJECT;
     STR2AVAL(key, "level");
     STR2AVAL(value, "status");
