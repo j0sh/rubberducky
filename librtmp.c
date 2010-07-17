@@ -181,9 +181,9 @@ static int send_cxn_resp(RTMP *rtmp, double txn)
   return RTMP_SendPacket(rtmp, &packet, FALSE);
 }
 
-typedef enum pub_type {publish = 0, unpublish} pub_type;
+typedef enum {publish = 0, unpublish} stream_cmd;
 static int send_fcpublish(RTMP *rtmp, AVal *streamname,
-                          double txn, pub_type action)
+                          double txn, stream_cmd action)
 {
     char pbuf[256], *end = pbuf+sizeof(pbuf), *enc = pbuf+RTMP_MAX_HEADER_SIZE, *foo;
     AVal key, value;
@@ -227,7 +227,7 @@ static int send_fcpublish(RTMP *rtmp, AVal *streamname,
     return RTMP_SendPacket(rtmp, &packet, FALSE);
 }
 
-static int send_onpublish(RTMP *rtmp, AVal *streamname, pub_type action)
+static int send_onpublish(RTMP *rtmp, AVal *streamname, stream_cmd action)
 {
     char pbuf[256], *end = pbuf+sizeof(pbuf), *enc = pbuf+RTMP_MAX_HEADER_SIZE, *foo;
     char tbuf[64], pubstr[64]; //XXX this might not be enough later on
