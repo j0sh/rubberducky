@@ -227,7 +227,7 @@ static int send_fcpublish(RTMP *rtmp, AVal *streamname,
     return RTMP_SendPacket(rtmp, &packet, FALSE);
 }
 
-static int send_onpublish(RTMP *rtmp, AVal *streamname, stream_cmd action)
+static int send_onstatus(RTMP *rtmp, AVal *streamname, stream_cmd action)
 {
     char pbuf[256], *end = pbuf+sizeof(pbuf), *enc = pbuf+RTMP_MAX_HEADER_SIZE, *foo;
     char tbuf[64], pubstr[64]; //XXX this might not be enough later on
@@ -419,13 +419,13 @@ void rtmp_invoke(RTMP *rtmp, RTMPPacket *pkt)
         // command object (index 2) is always null here.
         AMFProp_GetString(AMF_GetProp(&obj, NULL, 3), &val);
         AMFProp_GetString(AMF_GetProp(&obj, NULL, 4), &type); //XXX live/recod/append
-        send_onpublish(rtmp, &val, publish);
+        send_onstatus(rtmp, &val, publish);
     } else if(AVMATCH(&method, &av_deleteStream))
     {
         AVal type;
         AMFProp_GetString(AMF_GetProp(&obj, NULL, 3), &val);
         AMFProp_GetString(AMF_GetProp(&obj, NULL, 4), &type);
-        send_onpublish(rtmp, &val, unpublish);
+        send_onstatus(rtmp, &val, unpublish);
     }
     AMF_Reset(&obj);
 
