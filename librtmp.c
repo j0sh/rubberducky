@@ -42,6 +42,7 @@ SAVC(FCUnpublish);
 SAVC(createStream);
 SAVC(deleteStream);
 SAVC(publish);
+SAVC(play);
 
 #define STR2AVAL(av,str)	av.av_val = str; av.av_len = strlen(av.av_val)
 
@@ -181,7 +182,7 @@ static int send_cxn_resp(RTMP *rtmp, double txn)
   return RTMP_SendPacket(rtmp, &packet, FALSE);
 }
 
-typedef enum {publish = 0, unpublish} stream_cmd;
+typedef enum {publish = 0, unpublish, play} stream_cmd;
 static int send_fcpublish(RTMP *rtmp, AVal *streamname,
                           double txn, stream_cmd action)
 {
@@ -246,6 +247,13 @@ static int send_onstatus(RTMP *rtmp, AVal *streamname, stream_cmd action)
     case unpublish:
         strncpy(pubstr, "NetStream.Unpublish.Success", sizeof(pubstr));
         snprintf(tbuf, sizeof(tbuf), "%s is now unpublished.", streamname->av_val);
+        break;
+    case play:
+        //XXX this state really should be 'play pending' or something
+        //TODO send PlayPublishNotify when actually ready to play
+        //TODO send Play.Reset chunk before Play.Start
+        strncpy(pubstr, "NetStream.Play.Start", sizeof(pubstr));
+        snprintf(tbuf, sizeof(tbuf), "%s is now published.", streamname->av_val);
         break;
     default:
         strncpy(pubstr, "oops", sizeof(pubstr));
@@ -426,6 +434,11 @@ void rtmp_invoke(RTMP *rtmp, RTMPPacket *pkt)
         AMFProp_GetString(AMF_GetProp(&obj, NULL, 3), &val);
         AMFProp_GetString(AMF_GetProp(&obj, NULL, 4), &type);
         send_onstatus(rtmp, &val, unpublish);
+    } else if(AVMATCH(&method, &av_play))
+    {
+        AVal type;
+        AMFProp_GetString(AMF_GetProp(&obj, NULL, 3), &val);
+        send_onstatus(rtmp, &val, play);
     }
     AMF_Reset(&obj);
 
