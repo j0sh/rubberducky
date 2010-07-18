@@ -278,7 +278,7 @@ static int send_onstatus(RTMP *rtmp, AVal *streamname, stream_cmd action)
 
     foo = pbuf+RTMP_MAX_HEADER_SIZE;
     RTMPPacket packet = {
-        .m_nChannel = 0x03,
+        .m_nChannel = 0x04,
         .m_packetType = 0x14, // invoke
         .m_nTimeStamp = 0,
         .m_nInfoField2 = 0,
