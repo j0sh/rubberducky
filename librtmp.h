@@ -6,4 +6,6 @@
 #define RTMP_PORT         1935
 #define RTMP_PORT_STRING  QUOTEVALUE(RTMP_PORT)
 
-void rtmp_invoke(RTMP *rtmp, RTMPPacket *pkt);
+#include "mediaserver.h"
+
+void rtmp_invoke(RTMP *rtmp, RTMPPacket *pkt, srv_ctx *ctx);

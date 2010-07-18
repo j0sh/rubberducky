@@ -375,7 +375,7 @@ static void handle_connect(RTMP *rtmp, RTMPPacket *pkt, AMFObject *obj)
         }
 }
 
-void rtmp_invoke(RTMP *rtmp, RTMPPacket *pkt)
+void rtmp_invoke(RTMP *rtmp, RTMPPacket *pkt, srv_ctx *ctx)
 {
     char *body = pkt->m_body;
     int pkt_len = pkt->m_nBodySize;
@@ -428,6 +428,8 @@ void rtmp_invoke(RTMP *rtmp, RTMPPacket *pkt)
         AMFProp_GetString(AMF_GetProp(&obj, NULL, 3), &val);
         AMFProp_GetString(AMF_GetProp(&obj, NULL, 4), &type); //XXX live/recod/append
         send_onstatus(rtmp, &val, publish);
+        ctx->stream.fd = rtmp->m_sb.sb_socket;
+        strncpy(ctx->stream.name, val.av_val, sizeof(ctx->stream.name));
     } else if(AVMATCH(&method, &av_deleteStream))
     {
         AVal type;
@@ -439,6 +441,7 @@ void rtmp_invoke(RTMP *rtmp, RTMPPacket *pkt)
         AVal type;
         AMFProp_GetString(AMF_GetProp(&obj, NULL, 3), &val);
         send_onstatus(rtmp, &val, play);
+        ctx->stream.fds[ctx->stream.cxn_count++] = rtmp;
     }
     AMF_Reset(&obj);
 

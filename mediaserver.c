@@ -15,31 +15,12 @@
 #include <ev.h>
 
 /* local includes */
+#include "mediaserver.h"
 #include "librtmp.h"
 
 #define BACKLOG           20
 
 #define HOSTNAME "moneypenny"
-
-typedef struct client_ctx {
-    int fd;
-    int id;
-    int reads;
-    ev_io write_watcher;
-    ev_io read_watcher;
-    RTMP rtmp;
-    RTMPPacket packet;
-    struct client_ctx *next;
-}client_ctx;
-
-typedef struct srv_ctx {
-    int fd;
-    int connections;
-    int total_cxns;
-    struct ev_loop *loop;
-    ev_io io;             /* socket listener event */
-    client_ctx *clients;
-}srv_ctx;
 
 static int resolve_host(struct sockaddr_in *addr, const char *hostname)
 {
@@ -191,8 +172,17 @@ static void client_read_cb(struct ev_loop *loop, ev_io *io, int revents)
                     // do we realy need to do anything?
                     //AMF_DecodeInt32(pkt->m_body);
                     break;
+                case 0x08:
+                case 0x09: {
+                    int i = 0;
+                    for (i = 0; i < ctx->stream.cxn_count; i++)
+                    {
+                        RTMP_SendPacket(ctx->stream.fds[i], pkt, FALSE);
+                    }
+                    break;
+                }
                 case 0x14: /* invoke */
-                    rtmp_invoke(rtmp, pkt);
+                    rtmp_invoke(rtmp, pkt, ctx);
                     break;
                 }
                 RTMPPacket_Free(pkt);
@@ -319,6 +309,7 @@ int main(int argc, char** argv)
     ctx->connections = 0;
     ctx->total_cxns = 0;
     ctx->clients = NULL;
+    ctx->stream.cxn_count = 0;
     setup_events(ctx);
     ev_loop(ctx->loop, EVBACKEND_EPOLL);
 
