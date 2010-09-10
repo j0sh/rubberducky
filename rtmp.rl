@@ -201,12 +201,12 @@ static uint32_t get_uptime()
             *bi++ = rand();
         b = r->write_buf+1;
 
-        // imprint key
         b = r->write_buf+1;
 
         if (p[4]) {
-        r->off = get_digest_offset(b, digest_offset_values[digoff_init]);
-        calc_digest(r->off, b, genuine_fms_key, 36, b+r->off);
+            // imprint key
+            r->off = get_digest_offset(b, digest_offset_values[digoff_init]);
+            calc_digest(r->off, b, genuine_fms_key, 36, b+r->off);
         } else
             r->off = 0;
 

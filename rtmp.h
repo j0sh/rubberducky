@@ -13,7 +13,7 @@
 typedef struct {
     int cs; // current state of the packet parser
     int fd;
-    int off; // handshake offset
+    int off; // handshake offset. When off == 0, signals pre-FP9 cxns
     unsigned char read_buf[1600];
     unsigned char write_buf[1600];
     ev_io read_watcher;
