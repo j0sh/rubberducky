@@ -4,7 +4,7 @@ Requires libev, librtmp, openssl and Ragel.
 
 The makefile will probably have to be modified locally to suit your needs.
 
-$ ./make
+$ make
 $ ./a.out
 
 Connect with your rtmp client of choice. It establishes the cxn but does
