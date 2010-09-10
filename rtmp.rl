@@ -203,8 +203,12 @@ static uint32_t get_uptime()
 
         // imprint key
         b = r->write_buf+1;
+
+        if (p[4]) {
         r->off = get_digest_offset(b, digest_offset_values[digoff_init]);
         calc_digest(r->off, b, genuine_fms_key, 36, b+r->off);
+        } else
+            r->off = 0;
 
         send(r->fd, r->write_buf, (bend - r->write_buf), 0);
         fprintf(stdout, "sent: %d bytes\n", bend - r->write_buf);
@@ -217,7 +221,7 @@ static uint32_t get_uptime()
 
         // only if this is a Flash Player 9+ handshake
         // FP9 handshakes are only if major player version is >0
-        {
+        if (r->off) {
             unsigned char the_digest[SHA256_DIGEST_LENGTH];
             int off;
             if (!(off = verify_digest(p, genuine_fp_key, 30, digoff_init))) {
@@ -239,8 +243,8 @@ static uint32_t get_uptime()
                        sizeof(genuine_fms_key), the_digest);
             hmac(p, RTMP_SIG_SIZE - SHA256_DIGEST_LENGTH, the_digest,
                        SHA256_DIGEST_LENGTH, signature);
-            send(r->fd, p, RTMP_SIG_SIZE, 0);
         }
+        send(r->fd, p, RTMP_SIG_SIZE, 0);
         r->cs = cs; // save state
         fbreak;
     }
@@ -278,7 +282,7 @@ static uint32_t get_uptime()
         }
 
         // FP9 only
-        {
+        if (r->off) {
             unsigned char signature[SHA256_DIGEST_LENGTH];
             unsigned char thedigest[SHA256_DIGEST_LENGTH];
             unsigned char *b = r->write_buf+1;
@@ -293,8 +297,11 @@ static uint32_t get_uptime()
                 // TODO something drastic
                 fbreak;
             }
-            fprintf(stdout, "Great success: client handshake successful!\n");
         }
+        // we should verify the bytes returned match in pre-fp9 handshakes
+        // but: Postel's Law.
+
+        fprintf(stdout, "Great success: client handshake successful!\n");
         p += RTMP_SIG_SIZE;
         // process the rest
     }
