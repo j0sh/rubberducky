@@ -1,6 +1,6 @@
 The videoapi mediaserver. We need a better name for it.
 
-Requires libev and librtmp.
+Requires libev, librtmp, openssl and Ragel.
 
 The makefile will probably have to be modified locally to suit your needs.
 

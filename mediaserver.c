@@ -16,6 +16,7 @@
 
 /* local includes */
 #include "mediaserver.h"
+#include "rtmp.h"
 #include "librtmp.h"
 
 #define BACKLOG           20
@@ -235,19 +236,22 @@ static void incoming_cb(struct ev_loop *loop, ev_io *io, int revents)
     client->id = ctx->total_cxns++;
     client->reads = 0;
 
-    if (!RTMP_Serve(&client->rtmp)) {
-        errstr = "RTMP handshake failed";
-        goto fail;
-    }
-    //fcntl(clientfd, F_SETFL, O_NONBLOCK); // doesnt work well with librtmp
+    rtmp_parser_init(&client->rtmp2);
+    client->rtmp2.fd = clientfd;
+    client->rtmp2.read_watcher.data = ctx;
+
+    fcntl(clientfd, F_SETFL, O_NONBLOCK);
 
     /* setup the rest of the events */
     client->read_watcher.data = ctx;
-    ev_io_init(&client->read_watcher, client_read_cb, client->fd, EV_WRITE);
-    ev_io_start(ctx->loop, &client->read_watcher);
+    //ev_io_init(&client->read_watcher, client_read_cb, client->fd, EV_WRITE);
+    //ev_io_start(ctx->loop, &client->read_watcher);
 
     client->write_watcher.data = client;
     ev_io_init(&client->write_watcher, client_write_cb, client->fd, EV_READ);
+
+    ev_io_init(&client->rtmp2.read_watcher, rtmp_read, client->rtmp2.fd, EV_READ);
+    ev_io_start(ctx->loop, &client->rtmp2.read_watcher);
 
     // we can convert this to a readable hostname later
     // during some postprocessing/analytics stage.
