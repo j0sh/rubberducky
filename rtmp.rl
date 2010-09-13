@@ -13,6 +13,8 @@
 #include <openssl/sha.h>
 #include <openssl/hmac.h>
 
+#include <librtmp/amf.h>
+
 #if OPENSSL_VERSION_NUMBER < 0x0090800 || !defined(SHA256_DIGEST_LENGTH)
 #error Your OpenSSL is too old, need 0.9.8 or newer with SHA256
 #endif
@@ -303,7 +305,100 @@ static uint32_t get_uptime()
 
         fprintf(stdout, "Great success: client handshake successful!\n");
         p += RTMP_SIG_SIZE;
-        // process the rest
+
+        if (p == pe) fbreak;
+        p--; // process the rest. this feels brittle.
+    }
+
+    action proc_packet {
+        int header_type, chunk_id, chunk_size, to_increment = 0;
+        struct rtmp_packet *pkt;
+        header_type = (*p & 0xc0) >> 6;
+        chunk_id = *p & 0x3f;
+        fprintf(stdout, "header: %d, channel: %d, recv: %d\n",
+                        header_type, chunk_id, fc);
+
+        p += 1;
+
+        // TODO bounds checking
+        if (!chunk_id) {
+            chunk_id = *p + 64;
+            p += 1;
+        } else if (1 == chunk_id ) {
+            chunk_id = *p << 8 + p[1] + 64;
+            p += 2;
+        }
+
+        // get previous packet in chunk
+        if (r->channels[chunk_id]) {
+            pkt = r->channels[chunk_id];
+        } else {
+            if(!(pkt = malloc(sizeof(struct rtmp_packet)))) {
+                fprintf(stderr, "Failed to malloc space for packet!\n");
+                // XXX error out
+            }
+            memset(pkt, 0, sizeof(struct rtmp_packet)); // zero out
+            pkt->chunk_id = chunk_id;
+            r->channels[chunk_id] = pkt;
+        }
+
+        // NB:  we intentionally fallthrough here
+        switch (header_type) {
+        case 0:
+            if ((pe - p) < 11 ) goto parse_pkt_fail; // XXX error out
+            pkt->msg_id = AMF_DecodeInt32(&p[7]);
+            to_increment += 4;
+        case 1:
+            if ((pe - p) < 7) goto parse_pkt_fail; // XXX error out
+            pkt->msg_type = p[6];
+            pkt->size = AMF_DecodeInt24(&p[3]); // size exclusive of header
+            pkt->read = 0;
+            to_increment += 4;
+        case 2: {
+            uint32_t ts;
+            if ((pe - p) < 3) goto parse_pkt_fail; // XXX error out
+            ts = AMF_DecodeInt24(p);
+            to_increment += 3;
+            if (0xffffff == ts) {
+                // read in extended timestamp
+                static const int header_sizes[] = { 11, 7, 3 };
+                int hsize = header_sizes[header_type];
+                if (p + hsize + 4 > pe) goto parse_pkt_fail;
+
+                ts = AMF_DecodeInt32(p+hsize);
+                to_increment += 4;
+            }
+            if (!header_type)
+                pkt->timestamp = ts; // abs timestamp
+            else
+                pkt->timestamp += ts; // timestamp delta
+        }
+        case 3:
+            break;
+        }
+        p += to_increment;
+        fprintf(stdout, "Header type %d, timestamp %u, body size %d, read %d, msg type 0x%x, msg id %d\n", header_type, pkt->timestamp, pkt->size, pkt->read, pkt->msg_type, pkt->msg_id);
+
+        // copy packet data
+        if (!pkt->read) {
+            // allocate packet body
+            if (pkt->body) {
+                free(pkt->body);
+                pkt->body = NULL;
+            }
+            if (!(pkt->body = malloc(pkt->size))) {
+                fprintf(stderr, "Out of memory when allocating packet!\n");
+               // XXX do something drastic
+            }
+        }
+        chunk_size = r->chunk_size < (pkt->size - pkt->read) ? r->chunk_size : (pkt->size - pkt->read);
+        memcpy(pkt->body + pkt->read, p, chunk_size);
+        pkt->read += chunk_size;
+        fbreak;
+
+parse_pkt_fail:
+        fprintf(stderr,
+                "Header not big enough: type %d, but %d bytes received\n",                header_type, (pe - p));
     }
 
     # handshake types.
@@ -318,7 +413,7 @@ static uint32_t get_uptime()
 
     # states of the main machine
     handshake = part1 part2;
-    main := handshake;
+    main := handshake 0x0..0xff >proc_packet;
 }%%
 
 %% write data;
