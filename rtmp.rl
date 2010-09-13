@@ -327,6 +327,8 @@ int rtmp_parser_init(rtmp *r)
 {
     int cs = 0; // ragel specific variable
     %% write init;
+
+    rtmp_init(r);
     r->cs = cs;
 }
 

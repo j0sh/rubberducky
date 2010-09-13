@@ -114,6 +114,7 @@ static void free_client(srv_ctx *ctx, client_ctx *client)
     if (c->rtmp.Link.hostname.av_len)
         free(c->rtmp.Link.hostname.av_val);
     RTMP_Close(&c->rtmp);
+    rtmp_free(&c->rtmp2);
     free(c);
     ctx->connections--;
 }
@@ -130,6 +131,7 @@ static void free_all(srv_ctx *ctx)
         if(d->rtmp.Link.hostname.av_len)
             free(d->rtmp.Link.hostname.av_val); // XXX fix this
         RTMP_Close(&d->rtmp);
+        rtmp_free(&d->rtmp2);
         ev_io_stop(ctx->loop, &d->read_watcher);
         ev_io_stop(ctx->loop, &d->write_watcher);
         free(d);
