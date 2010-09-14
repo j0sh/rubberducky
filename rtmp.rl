@@ -268,7 +268,7 @@ static uint32_t get_uptime()
     }
 
     action unsupported {
-        fprintf(stdout, "Received unsuported rtmp handshake type %u, "
+        fprintf(stdout, "Received unsuported rtmp handshake type 0x%x, "
                         "disconecting fd %d\n", fc, r->fd);
         ev_io_stop(ctx->loop, io);
         close(r->fd);
