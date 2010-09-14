@@ -315,9 +315,6 @@ static uint32_t get_uptime()
         struct rtmp_packet *pkt;
         header_type = (*p & 0xc0) >> 6;
         chunk_id = *p & 0x3f;
-        fprintf(stdout, "header: %d, channel: %d, recv: %d\n",
-                        header_type, chunk_id, fc);
-
         p += 1;
 
         // TODO bounds checking
@@ -377,7 +374,6 @@ static uint32_t get_uptime()
             break;
         }
         p += to_increment;
-        fprintf(stdout, "Header type %d, timestamp %u, body size %d, read %d, msg type 0x%x, msg id %d\n", header_type, pkt->timestamp, pkt->size, pkt->read, pkt->msg_type, pkt->msg_id);
 
         // copy packet data
         if (!pkt->read) {
@@ -407,7 +403,18 @@ parse_pkt_fail:
         fbreak;
 
 parse_pkt_finish:
-        fprintf(stdout, "for 0x%x and 0x%x, packet left: %d, chunksize %d\n", (unsigned int)pe, (unsigned int)p, (pe - p), chunk_size);
+        fprintf(stdout, "Packet/Chunk parameters:\n"
+                        "%15s %d\n%15s %d\n%15s %u\n"
+                        "%15s %d\n%15s %d\n%15s 0x%x\n"
+                        "%15s %d\n%15s %d\n",
+                        "header type", header_type,
+                        "chunk id",    chunk_id,
+                        "timestamp",   pkt->timestamp,
+                        "body size",   pkt->size,
+                        "read",        pkt->read,
+                        "msg type",    pkt->msg_type,
+                        "msg id",      pkt->msg_id,
+                        "chunksize",   chunk_size);
 
         if (pe == p) {
             p--;
