@@ -227,14 +227,13 @@ static uint32_t get_uptime()
             int off;
             if (!(off = verify_digest(p, genuine_fp_key, 30, digoff_init))) {
                 fprintf(stderr, "client digest failed\n");
-                //TODO something drastic
+                goto read_error;
             }
 
-            // TODO check for overflow here
             if ((pe - p) != RTMP_SIG_SIZE) {
                 fprintf(stderr, "Client buffer not big enough\n");
-                // TODO something drastic.
                 // Perhaps the size should be checked earlier.
+                goto read_error;
             }
 
             // imprint server signature into client response
@@ -264,11 +263,8 @@ static uint32_t get_uptime()
     }
 
     action unsupported {
-        fprintf(stdout, "Received unsuported rtmp handshake type 0x%x, "
-                        "disconecting fd %d\n", fc, r->fd);
-        ev_io_stop(ctx->loop, io);
-        close(r->fd);
-        return;
+        fprintf(stdout, "Received unsuported rtmp handshake type 0x%x\n", fc);
+        goto read_error;
     }
 
     action versioned_response2 {
@@ -276,7 +272,7 @@ static uint32_t get_uptime()
         if ((pe - p) < RTMP_SIG_SIZE) {
             fprintf(stderr, "Did not receive enough bytes from handshake response, expected %d got %d\n", RTMP_SIG_SIZE, pe - p);
             // TODO something drastic
-            fbreak;
+            goto read_error;
         }
 
         // FP9 only
@@ -292,8 +288,7 @@ static uint32_t get_uptime()
             if (memcmp(signature, &p[RTMP_SIG_SIZE - SHA256_DIGEST_LENGTH],
                        SHA256_DIGEST_LENGTH)) {
                 fprintf(stderr, "Client not genuine Adobe\n");
-                // TODO something drastic
-                fbreak;
+                goto read_error;
             }
         }
         // we should verify the bytes returned match in pre-fp9 handshakes
@@ -380,13 +375,16 @@ static uint32_t get_uptime()
             }
             if (!(pkt->body = malloc(pkt->size))) {
                 fprintf(stderr, "Out of memory when allocating packet!\n");
-               // XXX do something drastic
+                goto read_error;
             }
         }
         chunk_size = r->chunk_size < (pkt->size - pkt->read) ? r->chunk_size : (pkt->size - pkt->read);
         if (p+chunk_size > pe) {
             fprintf(stdout, "Error: overreading p\n");
-            fbreak; // XXX do something a little more drastic
+            // Shutting down here might not always be the best idea;
+            // it is very possible that our incoming packet buffer
+            // was just not big enough; in that case we should enlarge it
+            goto read_error;
         }
         memcpy(pkt->body + pkt->read, p, chunk_size);
         pkt->read += chunk_size;
@@ -396,7 +394,7 @@ static uint32_t get_uptime()
 parse_pkt_fail:
         fprintf(stderr,
                 "Header not big enough: type %d, but %d bytes received\n",                header_type, (pe - p));
-        fbreak;
+        goto read_error;
 
 parse_pkt_finish:
         fprintf(stdout, "Packet/Chunk parameters:\n"
@@ -465,10 +463,8 @@ void rtmp_read(struct ev_loop *loop, ev_io *io, int revents)
     int len = recv(r->fd, r->read_buf, sizeof(r->read_buf), 0);
     if (!len)
     {
-        fprintf(stderr, "Bad read, disconnecting fd %d\n", r->fd);
-        ev_io_stop(ctx->loop, io);
-        close(r->fd);
-        return;
+        fprintf(stderr, "Bad read\n");
+        goto read_error;
     }
 
     p = r->read_buf;
@@ -477,4 +473,10 @@ void rtmp_read(struct ev_loop *loop, ev_io *io, int revents)
     %%write exec;
 
     r->cs = cs;
+    return;
+
+read_error:
+    fprintf(stderr, "Disconnecting fd %d\n", r->fd);
+    ev_io_stop(ctx->loop, io);
+    close(r->fd);
 }
