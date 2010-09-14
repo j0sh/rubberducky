@@ -392,6 +392,10 @@ static uint32_t get_uptime()
             }
         }
         chunk_size = r->chunk_size < (pkt->size - pkt->read) ? r->chunk_size : (pkt->size - pkt->read);
+        if (p+chunk_size > pe) {
+            fprintf(stdout, "Error: overreading p\n");
+            fbreak; // XXX do something a little more drastic
+        }
         memcpy(pkt->body + pkt->read, p, chunk_size);
         pkt->read += chunk_size;
         p += chunk_size;
