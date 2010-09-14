@@ -444,7 +444,7 @@ void rtmp_read(struct ev_loop *loop, ev_io *io, int revents)
     int digoff_init;
 
     // make sure this is nonblocking
-    int len = recv(r->fd, r->read_buf, sizeof(r->write_buf), 0);
+    int len = recv(r->fd, r->read_buf, sizeof(r->read_buf), 0);
     if (!len)
     {
         fprintf(stderr, "Bad read, disconnecting fd %d\n", r->fd);
