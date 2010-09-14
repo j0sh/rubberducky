@@ -394,11 +394,22 @@ static uint32_t get_uptime()
         chunk_size = r->chunk_size < (pkt->size - pkt->read) ? r->chunk_size : (pkt->size - pkt->read);
         memcpy(pkt->body + pkt->read, p, chunk_size);
         pkt->read += chunk_size;
-        fbreak;
+        p += chunk_size;
+        goto parse_pkt_finish; // shoot me
 
 parse_pkt_fail:
         fprintf(stderr,
                 "Header not big enough: type %d, but %d bytes received\n",                header_type, (pe - p));
+        fbreak;
+
+parse_pkt_finish:
+        fprintf(stdout, "for 0x%x and 0x%x, packet left: %d, chunksize %d\n", (unsigned int)pe, (unsigned int)p, (pe - p), chunk_size);
+
+        if (pe == p) {
+            p--;
+            fbreak;
+        }
+        p--; // hideous
     }
 
     # handshake types.
@@ -413,7 +424,7 @@ parse_pkt_fail:
 
     # states of the main machine
     handshake = part1 part2;
-    main := handshake 0x0..0xff >proc_packet;
+    main := handshake (0x0..0xff)* $proc_packet;
 }%%
 
 %% write data;
