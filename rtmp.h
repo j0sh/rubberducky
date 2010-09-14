@@ -28,7 +28,7 @@ typedef struct {
     int fd;
     int off; // handshake offset. When off == 0, signals pre-FP9 cxns
     int chunk_size; // max 65546 bytes
-    unsigned char read_buf[1600];
+    unsigned char read_buf[2600]; // TODO investigate max size
     unsigned char write_buf[1600];
     struct rtmp_packet *channels[RTMP_CHANNELS]; // find a better way
     ev_io read_watcher;
