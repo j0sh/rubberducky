@@ -213,7 +213,6 @@ static uint32_t get_uptime()
             r->off = 0;
 
         send(r->fd, r->write_buf, (bend - r->write_buf), 0);
-        fprintf(stdout, "sent: %d bytes\n", bend - r->write_buf);
 
         // decode client request
         memcpy(&uptime, p, 4);
@@ -230,7 +229,6 @@ static uint32_t get_uptime()
                 fprintf(stderr, "client digest failed\n");
                 //TODO something drastic
             }
-            fprintf(stdout, "client digest passed\n");
 
             // TODO check for overflow here
             if ((pe - p) != RTMP_SIG_SIZE) {
@@ -255,7 +253,6 @@ static uint32_t get_uptime()
         version = fc;
         digoff_init = 1;
         p += 1;
-        fprintf(stdout, "Received a request for an encrypted session. %d\n", version);
         // XXX '128' at the fifth byte indicates a Flash 10 session.
         // XXX RTMPE type 8 involves XTEA encryption of the signature.
     }
@@ -264,7 +261,6 @@ static uint32_t get_uptime()
         version = fc;
         digoff_init = 0;
         p += 1;
-        fprintf(stdout, "plain handshake, version %d\n", version);
     }
 
     action unsupported {
@@ -475,12 +471,10 @@ void rtmp_read(struct ev_loop *loop, ev_io *io, int revents)
         return;
     }
 
-    printf("processing rtmp packet (length %d)\n", len);
     p = r->read_buf;
     pe = r->read_buf+len;
 
     %%write exec;
 
-    fprintf(stdout, "finished processing rtmp packet.\n");
     r->cs = cs;
 }
