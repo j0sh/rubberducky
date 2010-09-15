@@ -23,7 +23,7 @@ struct rtmp_packet {
     unsigned char *body;
  };
 
-typedef struct {
+typedef struct rtmp {
     int cs; // current state of the packet parser
     int fd;
     int off; // handshake offset. When off == 0, signals pre-FP9 cxns
@@ -32,6 +32,7 @@ typedef struct {
     unsigned char write_buf[1600];
     struct rtmp_packet *channels[RTMP_CHANNELS]; // find a better way
     ev_io read_watcher;
+    void (*read_cb)(struct rtmp *r, struct rtmp_packet *pkt);
 }rtmp;
 
 int rtmp_parser_init(rtmp *r);
