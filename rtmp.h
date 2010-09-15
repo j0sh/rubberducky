@@ -31,6 +31,7 @@ typedef struct rtmp {
     unsigned char read_buf[2600]; // TODO investigate max size
     unsigned char write_buf[1600];
     struct rtmp_packet *in_channels[RTMP_CHANNELS]; // find a better way
+    struct rtmp_packet *out_channels[RTMP_CHANNELS];
     ev_io read_watcher;
     void (*read_cb)(struct rtmp *r, struct rtmp_packet *pkt);
 }rtmp;
