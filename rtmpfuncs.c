@@ -10,18 +10,22 @@ int rtmp_init(rtmp *r)
     r->read_cb = NULL;
 }
 
+static void free_packet(struct rtmp_packet **packet) {
+    struct rtmp_packet *pkt = *packet;
+    if (pkt) {
+        if (pkt->body) {
+            free(pkt->body);
+            pkt->body = NULL;
+        }
+        free(pkt);
+        *packet = NULL;
+    }
+}
+
 void rtmp_free(rtmp *r)
 {
     int i;
     for (i = 0; i < RTMP_CHANNELS; i++) {
-        struct rtmp_packet *pkt = r->in_channels[i];
-        if (pkt) {
-            if (pkt->body) {
-                free(pkt->body);
-                pkt->body = NULL;
-            }
-            free(pkt);
-            r->in_channels[i] = NULL;
-        }
+        free_packet(&r->in_channels[i]);
     }
 }
