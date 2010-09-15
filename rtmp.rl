@@ -339,23 +339,25 @@ static uint32_t get_uptime()
         // NB:  we intentionally fallthrough here
         switch (header_type) {
         case CHUNK_LARGE:
-            if ((pe - p) < 11 ) goto parse_pkt_fail; // XXX error out
+            if ((pe - p) < CHUNK_SIZE_LARGE) goto parse_pkt_fail;
             pkt->msg_id = AMF_DecodeInt32((const char *)&p[7]);
             to_increment += 4;
         case CHUNK_MEDIUM:
-            if ((pe - p) < 7) goto parse_pkt_fail; // XXX error out
+            if ((pe - p) < CHUNK_SIZE_MEDIUM ) goto parse_pkt_fail;
             pkt->msg_type = p[6];
             pkt->size = AMF_DecodeInt24((const char*)&p[3]); // size exclusive of header
             pkt->read = 0;
             to_increment += 4;
         case CHUNK_SMALL: {
             uint32_t ts;
-            if ((pe - p) < 3) goto parse_pkt_fail; // XXX error out
+            if ((pe - p) < CHUNK_SIZE_SMALL) goto parse_pkt_fail; // XXX error out
             ts = AMF_DecodeInt24((const char*)p);
             to_increment += 3;
             if (0xffffff == ts) {
                 // read in extended timestamp
-                static const int header_sizes[] = { 11, 7, 3 };
+                static const int header_sizes[] = { CHUNK_SIZE_LARGE,
+                                                    CHUNK_SIZE_MEDIUM,
+                                                    CHUNK_SIZE_SMALL };
                 int hsize = header_sizes[header_type];
                 if (p + hsize + 4 > pe) goto parse_pkt_fail;
 

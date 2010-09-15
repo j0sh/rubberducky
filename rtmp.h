@@ -13,6 +13,12 @@
 #define RTMP_CHANNELS 65600
 #define RTMP_DEFAULT_CHUNKSIZE 128
 
+// size in bytes
+enum chunk_sizes { CHUNK_SIZE_LARGE  = 11,
+                   CHUNK_SIZE_MEDIUM =  7,
+                   CHUNK_SIZE_SMALL  =  3,
+                   CHUNK_SIZE_TINY   =  0 };
+
 enum chunk_types { CHUNK_LARGE = 0, CHUNK_MEDIUM, CHUNK_SMALL, CHUNK_TINY };
 
 struct rtmp_packet {
