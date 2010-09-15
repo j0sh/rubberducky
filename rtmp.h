@@ -20,9 +20,9 @@ struct rtmp_packet {
     int chunk_id;
     int msg_id; // useless?
     int msg_type;
-    int timestamp;
     int size;
     int read;
+    uint32_t timestamp;
     unsigned char *body;
  };
 
