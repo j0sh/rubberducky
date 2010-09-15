@@ -13,7 +13,10 @@
 #define RTMP_CHANNELS 65600
 #define RTMP_DEFAULT_CHUNKSIZE 128
 
+enum chunk_types { CHUNK_LARGE = 0, CHUNK_MEDIUM, CHUNK_SMALL, CHUNK_TINY };
+
 struct rtmp_packet {
+    enum chunk_types chunk_type;
     int chunk_id;
     int msg_id; // useless?
     int msg_type;

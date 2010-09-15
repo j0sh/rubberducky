@@ -334,20 +334,21 @@ static uint32_t get_uptime()
             pkt->chunk_id = chunk_id;
             r->in_channels[chunk_id] = pkt;
         }
+        pkt->chunk_type = header_type;
 
         // NB:  we intentionally fallthrough here
         switch (header_type) {
-        case 0:
+        case CHUNK_LARGE:
             if ((pe - p) < 11 ) goto parse_pkt_fail; // XXX error out
             pkt->msg_id = AMF_DecodeInt32(&p[7]);
             to_increment += 4;
-        case 1:
+        case CHUNK_MEDIUM:
             if ((pe - p) < 7) goto parse_pkt_fail; // XXX error out
             pkt->msg_type = p[6];
             pkt->size = AMF_DecodeInt24(&p[3]); // size exclusive of header
             pkt->read = 0;
             to_increment += 4;
-        case 2: {
+        case CHUNK_SMALL: {
             uint32_t ts;
             if ((pe - p) < 3) goto parse_pkt_fail; // XXX error out
             ts = AMF_DecodeInt24(p);
