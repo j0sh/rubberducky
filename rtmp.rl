@@ -62,7 +62,7 @@ const static int digest_offset_values[] = { 8, 772 };
 const static int dh_offset_values[] = { 1532, 768 };
 
 // offset for the diffie-hellman key pair. rtmpe only; unused now
-static unsigned int
+static videoapi_unused unsigned int
 get_dh_offset(uint8_t *handshake, unsigned int len,
               int initial_offset, int second_offset)
 {
@@ -179,7 +179,7 @@ static uint32_t get_uptime()
     }
 
     action versioned_response {
-        int sent, type, i, size, *bi;
+        int i, *bi;
         uint32_t uptime;
         unsigned char *b = r->write_buf, *bend = b+1+RTMP_SIG_SIZE;
         unsigned char *signature;
@@ -318,7 +318,7 @@ static uint32_t get_uptime()
             chunk_id = *p + 64;
             p += 1;
         } else if (1 == chunk_id ) {
-            chunk_id = *p << 8 + p[1] + 64;
+            chunk_id = (*p << 8) + p[1] + 64;
             p += 2;
         }
 
@@ -340,18 +340,18 @@ static uint32_t get_uptime()
         switch (header_type) {
         case CHUNK_LARGE:
             if ((pe - p) < 11 ) goto parse_pkt_fail; // XXX error out
-            pkt->msg_id = AMF_DecodeInt32(&p[7]);
+            pkt->msg_id = AMF_DecodeInt32((const char *)&p[7]);
             to_increment += 4;
         case CHUNK_MEDIUM:
             if ((pe - p) < 7) goto parse_pkt_fail; // XXX error out
             pkt->msg_type = p[6];
-            pkt->size = AMF_DecodeInt24(&p[3]); // size exclusive of header
+            pkt->size = AMF_DecodeInt24((const char*)&p[3]); // size exclusive of header
             pkt->read = 0;
             to_increment += 4;
         case CHUNK_SMALL: {
             uint32_t ts;
             if ((pe - p) < 3) goto parse_pkt_fail; // XXX error out
-            ts = AMF_DecodeInt24(p);
+            ts = AMF_DecodeInt24((const char*)p);
             to_increment += 3;
             if (0xffffff == ts) {
                 // read in extended timestamp
@@ -359,7 +359,7 @@ static uint32_t get_uptime()
                 int hsize = header_sizes[header_type];
                 if (p + hsize + 4 > pe) goto parse_pkt_fail;
 
-                ts = AMF_DecodeInt32(p+hsize);
+                ts = AMF_DecodeInt32((const char*)p+hsize);
                 to_increment += 4;
             }
             if (!header_type)

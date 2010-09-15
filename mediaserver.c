@@ -6,6 +6,8 @@
 
 #include <sys/types.h>
 #include <sys/socket.h>
+#include <arpa/inet.h>
+#include <unistd.h>
 #include <netdb.h>
 #include <fcntl.h>
 
@@ -156,7 +158,7 @@ static inline client_ctx* get_client_from_reader(ev_io *w)
     return (client_ctx*)((char *)w - offsetof(client_ctx, read_watcher));
 }
 
-static void client_read_cb(struct ev_loop *loop, ev_io *io, int revents)
+static videoapi_unused void client_read_cb(struct ev_loop *loop, ev_io *io, int revents)
 {
     srv_ctx *ctx = io->data;
     client_ctx *client = get_client_from_reader(io);

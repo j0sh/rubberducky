@@ -6,6 +6,14 @@
 
 #include "rtmp.h"
 
+#ifndef videoapi_unused
+#if defined(__GNUC__)
+#   define videoapi_unused __attribute__((unused))
+#else
+#   define videoapi_unused
+#endif
+#endif
+
 typedef struct client_ctx {
     int fd;
     int id;

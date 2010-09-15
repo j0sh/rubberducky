@@ -438,7 +438,6 @@ void rtmp_invoke(RTMP *rtmp, RTMPPacket *pkt, srv_ctx *ctx)
         send_onstatus(rtmp, &val, unpublish);
     } else if(AVMATCH(&method, &av_play))
     {
-        AVal type;
         AMFProp_GetString(AMF_GetProp(&obj, NULL, 3), &val);
         send_onstatus(rtmp, &val, play);
         ctx->stream.fds[ctx->stream.cxn_count++] = rtmp;
