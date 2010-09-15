@@ -443,7 +443,7 @@ parse_pkt_finish:
 
 %% write data;
 
-int rtmp_parser_init(rtmp *r)
+void rtmp_parser_init(rtmp *r)
 {
     int cs = 0; // ragel specific variable
     %% write init;

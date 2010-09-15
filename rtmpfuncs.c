@@ -3,7 +3,7 @@
 #include <string.h>
 #include <stdlib.h>
 
-int rtmp_init(rtmp *r)
+void rtmp_init(rtmp *r)
 {
     memset(r->in_channels, 0, sizeof(struct rtmp_packet*) * RTMP_CHANNELS);
     memset(r->out_channels, 0, sizeof(struct rtmp_packet*) * RTMP_CHANNELS);

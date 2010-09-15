@@ -39,8 +39,8 @@ typedef struct rtmp {
     void (*read_cb)(struct rtmp *r, struct rtmp_packet *pkt);
 }rtmp;
 
-int rtmp_parser_init(rtmp *r);
-int rtmp_init(rtmp *r);
+void rtmp_parser_init(rtmp *r);
+void rtmp_init(rtmp *r);
 void rtmp_free(rtmp *r);
 void rtmp_read(struct ev_loop *loop, ev_io *io, int revents);
 void CalculateDigest(unsigned int digestPos, uint8_t *handshakeMessage,
