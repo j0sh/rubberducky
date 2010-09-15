@@ -323,8 +323,8 @@ static uint32_t get_uptime()
         }
 
         // get previous packet in chunk
-        if (r->channels[chunk_id]) {
-            pkt = r->channels[chunk_id];
+        if (r->in_channels[chunk_id]) {
+            pkt = r->in_channels[chunk_id];
         } else {
             if(!(pkt = malloc(sizeof(struct rtmp_packet)))) {
                 fprintf(stderr, "Failed to malloc space for packet!\n");
@@ -332,7 +332,7 @@ static uint32_t get_uptime()
             }
             memset(pkt, 0, sizeof(struct rtmp_packet)); // zero out
             pkt->chunk_id = chunk_id;
-            r->channels[chunk_id] = pkt;
+            r->in_channels[chunk_id] = pkt;
         }
 
         // NB:  we intentionally fallthrough here
