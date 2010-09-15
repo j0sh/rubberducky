@@ -262,6 +262,11 @@ static uint32_t get_uptime()
         p += 1;
     }
 
+    action http {
+        fprintf(stderr, "Received POST; RTMPT unsupported.\n");
+        goto read_error;
+    }
+
     action unsupported {
         fprintf(stdout, "Received unsuported rtmp handshake type 0x%x\n", fc);
         goto read_error;
@@ -421,8 +426,9 @@ parse_pkt_finish:
     # note that actions are executed in the order they are visited
     rtmp = 0x03;
     rtmpe = 0x06 | 0x08;
+    rtmpt = "post" | "POST";
 
-    transport = rtmp > plain | rtmpe > enc;
+    transport = rtmp > plain | rtmpe > enc | rtmpt > http;
     part1 = transport @ versioned_response | 0x0..0xff @ unsupported;
 
     part2 = 0x0..0xff >versioned_response2;
