@@ -419,11 +419,11 @@ parse_pkt_finish:
 
     # handshake types.
     # note that actions are executed in the order they are visited
-    plain_handshake = 0x03;
-    encrypted_handshake = 0x06 | 0x08; # only invoked for rtmpe
+    rtmp = 0x03;
+    rtmpe = 0x06 | 0x08;
 
-    handshake_type = plain_handshake > plain | encrypted_handshake > enc;
-    part1 = handshake_type @ versioned_response | 0x0..0xff @ unsupported;
+    transport = rtmp > plain | rtmpe > enc;
+    part1 = transport @ versioned_response | 0x0..0xff @ unsupported;
 
     part2 = 0x0..0xff >versioned_response2;
 
