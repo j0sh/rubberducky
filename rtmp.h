@@ -14,21 +14,26 @@
 #define RTMP_DEFAULT_CHUNKSIZE 128
 
 // size in bytes
-enum chunk_sizes { CHUNK_SIZE_LARGE  = 11,
+typedef enum chunk_sizes { CHUNK_SIZE_LARGE  = 11,
                    CHUNK_SIZE_MEDIUM =  7,
                    CHUNK_SIZE_SMALL  =  3,
-                   CHUNK_SIZE_TINY   =  0 };
+                   CHUNK_SIZE_TINY   =  0
+}chunk_sizes;
 
-enum chunk_types { CHUNK_LARGE = 0, CHUNK_MEDIUM, CHUNK_SMALL, CHUNK_TINY };
+typedef enum chunk_types { CHUNK_LARGE = 0,
+                           CHUNK_MEDIUM,
+                           CHUNK_SMALL,
+                           CHUNK_TINY
+}chunk_types;
 
 struct rtmp_packet {
-    enum chunk_types chunk_type;
     int chunk_id;
     int msg_id; // useless?
     int msg_type;
     int size;
     int read;
     uint32_t timestamp;
+    chunk_types chunk_type;
     unsigned char *body;
  };
 
