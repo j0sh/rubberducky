@@ -54,6 +54,7 @@ void rtmp_parser_init(rtmp *r);
 void rtmp_init(rtmp *r);
 void rtmp_free(rtmp *r);
 void rtmp_read(struct ev_loop *loop, ev_io *io, int revents);
+int  rtmp_send(rtmp *r, struct rtmp_packet *pkt);
 void CalculateDigest(unsigned int digestPos, uint8_t *handshakeMessage,
 		        const uint8_t *key, size_t keyLen, uint8_t *digest);
 
