@@ -12,7 +12,7 @@
 
 #include <librtmp/amf.h>
 
-#include "librtmp.h"
+#include "process_messages.h"
 
 // yanked wholesale from librtmp
 #define SAVC(x) static const AVal av_##x = AVC(#x)

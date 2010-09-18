@@ -12,14 +12,13 @@
 #include <fcntl.h>
 
 /* lib includes */
-#include <librtmp/rtmp.h>
 #include <librtmp/log.h>
 #include <ev.h>
 
 /* local includes */
 #include "mediaserver.h"
 #include "rtmp.h"
-#include "librtmp.h"
+#include "process_messages.h"
 
 #define BACKLOG           20
 

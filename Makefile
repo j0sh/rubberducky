@@ -6,7 +6,7 @@ CC=gcc
 
 default:
 	ragel rtmp.rl
-	$(CC) $(OPTS) $(DEPS) mediaserver.c librtmp.c rtmp.c rtmpfuncs.c
+	$(CC) $(OPTS) $(DEPS) mediaserver.c process_messages.c rtmp.c rtmpfuncs.c
 dot:
 	ragel -V rtmp.rl > rtmp.dot
 	dot rtmp.dot -Tps > rtmp.ps
