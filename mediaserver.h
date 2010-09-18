@@ -14,11 +14,8 @@
 #endif
 
 typedef struct client_ctx {
-    int fd;
     int id;
     int reads;
-    ev_io write_watcher;
-    ev_io read_watcher;
     rtmp rtmp;
     struct client_ctx *next;
 }client_ctx;

@@ -102,15 +102,6 @@ static void free_client(srv_ctx *ctx, client_ctx *client)
     else
         p->next = c->next;
 
-    ev_io_stop(ctx->loop, &c->read_watcher);
-    ev_io_stop(ctx->loop, &c->write_watcher);
-
-    /* close()ing this socket, although seemingly
-     * the Right Thing, could break a lot of things!
-     * apparently when a cxn closes while another is
-     * pending, Linux will silently reuse the old
-     * FD for the new cxn... */
-    //close(c->fd);
     fprintf(stdout, "(%d) Disconnecting\n", c->id);
     rtmp_free(&c->rtmp);
     free(c);
@@ -125,7 +116,6 @@ static void free_all(srv_ctx *ctx)
     while (c) {
         client_ctx *d = c;
         c = c->next;
-        close(d->fd);
         rtmp_free(&d->rtmp);
         free(d);
     }
@@ -179,7 +169,6 @@ static void incoming_cb(struct ev_loop *loop, ev_io *io, int revents)
     client->next = ctx->clients;
     ctx->clients = client;
     ctx->connections++;
-    client->fd = clientfd;
     client->id = ctx->total_cxns++;
     client->reads = 0;
 
