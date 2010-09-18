@@ -308,7 +308,7 @@ static uint32_t get_uptime()
 
     action proc_packet {
         int header_type, chunk_id, chunk_size, to_increment = 0;
-        struct rtmp_packet *pkt;
+        rtmp_packet *pkt;
         header_type = (*p & 0xc0) >> 6;
         chunk_id = *p & 0x3f;
         p += 1;
@@ -326,11 +326,11 @@ static uint32_t get_uptime()
         if (r->in_channels[chunk_id]) {
             pkt = r->in_channels[chunk_id];
         } else {
-            if(!(pkt = malloc(sizeof(struct rtmp_packet)))) {
+            if(!(pkt = malloc(sizeof(rtmp_packet)))) {
                 fprintf(stderr, "Failed to malloc space for packet!\n");
                 // XXX error out
             }
-            memset(pkt, 0, sizeof(struct rtmp_packet)); // zero out
+            memset(pkt, 0, sizeof(rtmp_packet)); // zero out
             pkt->chunk_id = chunk_id;
             r->in_channels[chunk_id] = pkt;
         }

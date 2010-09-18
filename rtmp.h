@@ -26,7 +26,7 @@ typedef enum chunk_types { CHUNK_LARGE = 0,
                            CHUNK_TINY
 }chunk_types;
 
-struct rtmp_packet {
+typedef struct rtmp_packet {
     int chunk_id;
     int msg_id; // useless?
     int msg_type;
@@ -35,7 +35,7 @@ struct rtmp_packet {
     uint32_t timestamp;
     chunk_types chunk_type;
     uint8_t *body;
- };
+ }rtmp_packet;
 
 typedef struct rtmp {
     int cs; // current state of the packet parser
@@ -44,10 +44,10 @@ typedef struct rtmp {
     int chunk_size; // max 65546 bytes
     uint8_t read_buf[2600]; // TODO investigate max size
     uint8_t write_buf[1600];
-    struct rtmp_packet *in_channels[RTMP_CHANNELS]; // find a better way
-    struct rtmp_packet *out_channels[RTMP_CHANNELS];
+    rtmp_packet *in_channels[RTMP_CHANNELS]; // find a better way
+    rtmp_packet *out_channels[RTMP_CHANNELS];
     ev_io read_watcher;
-    void (*read_cb)(struct rtmp *r, struct rtmp_packet *pkt);
+    void (*read_cb)(struct rtmp *r, rtmp_packet *pkt);
 }rtmp;
 
 void rtmp_parser_init(rtmp *r);
