@@ -1,5 +1,3 @@
-#include <librtmp/rtmp.h>
-
 #define QUOTELITERAL(x) #x
 #define QUOTEVALUE(x) QUOTELITERAL(x)
 
@@ -8,4 +6,4 @@
 
 #include "mediaserver.h"
 
-void rtmp_invoke(RTMP *rtmp, RTMPPacket *pkt, srv_ctx *ctx);
+void rtmp_invoke(rtmp *rtmp, struct rtmp_packet *pkt, srv_ctx *ctx);

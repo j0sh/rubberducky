@@ -10,6 +10,8 @@
 #define FMS_VER_MICRO 1
 #define FMS_VER_NANO  1
 
+// 3 (chunk header) + 11 (header) + 4 (extended timestamp) = 18
+#define RTMP_MAX_HEADER_SIZE 18
 #define RTMP_CHANNELS 65600
 #define RTMP_DEFAULT_CHUNKSIZE 128
 
