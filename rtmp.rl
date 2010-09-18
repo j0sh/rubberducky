@@ -87,9 +87,9 @@ get_dh_offset(uint8_t *handshake, unsigned int len,
   return offset;
 }
 
-static int get_digest_offset(unsigned char *b, int initial_offset)
+static int get_digest_offset(uint8_t *b, int initial_offset)
 {
-    unsigned char *ptr = b+initial_offset;
+    uint8_t *ptr = b+initial_offset;
     unsigned int offset = 0;
 
     offset += *ptr;
@@ -125,7 +125,7 @@ static void hmac(const uint8_t *message, size_t messageLen,
 }
 
 static void calc_digest(unsigned int digestPos, uint8_t *handshake_msg,
-                        const unsigned char *key, size_t keylen,
+                        const uint8_t *key, size_t keylen,
                         uint8_t *digest)
 {
     const int messageLen = RTMP_SIG_SIZE - SHA256_DIGEST_LENGTH;
@@ -181,8 +181,8 @@ static uint32_t get_uptime()
     action versioned_response {
         int i, *bi;
         uint32_t uptime;
-        unsigned char *b = r->write_buf, *bend = b+1+RTMP_SIG_SIZE;
-        unsigned char *signature;
+        uint8_t *b = r->write_buf, *bend = b+1+RTMP_SIG_SIZE;
+        uint8_t *signature;
 
         fprintf(stdout, "received handshake type %u \n", version);
 
@@ -223,7 +223,7 @@ static uint32_t get_uptime()
         // only if this is a Flash Player 9+ handshake
         // FP9 handshakes are only if major player version is >0
         if (r->off) {
-            unsigned char the_digest[SHA256_DIGEST_LENGTH];
+            uint8_t the_digest[SHA256_DIGEST_LENGTH];
             int off;
             if (!(off = verify_digest(p, genuine_fp_key, 30, digoff_init))) {
                 fprintf(stderr, "client digest failed\n");
@@ -282,9 +282,9 @@ static uint32_t get_uptime()
 
         // FP9 only
         if (r->off) {
-            unsigned char signature[SHA256_DIGEST_LENGTH];
-            unsigned char thedigest[SHA256_DIGEST_LENGTH];
-            unsigned char *b = r->write_buf+1;
+            uint8_t signature[SHA256_DIGEST_LENGTH];
+            uint8_t thedigest[SHA256_DIGEST_LENGTH];
+            uint8_t *b = r->write_buf+1;
             // verify client response
             hmac(&b[r->off], SHA256_DIGEST_LENGTH, genuine_fp_key,
                  sizeof(genuine_fp_key), thedigest);
@@ -456,18 +456,18 @@ void rtmp_parser_init(rtmp *r)
 
 static inline rtmp* get_rtmp(ev_io *w)
 {
-    return (rtmp*)((char*)w - offsetof(rtmp, read_watcher));
+    return (rtmp*)((uint8_t*)w - offsetof(rtmp, read_watcher));
 }
 
 void rtmp_read(struct ev_loop *loop, ev_io *io, int revents)
 {
-    unsigned char *p, *pe; // ragel specific variables
+    uint8_t *p, *pe; // ragel specific variables
     rtmp *r = get_rtmp(io);
     srv_ctx *ctx = io->data;
     int cs = r->cs;
 
     // locally scoped stuff thats also used within actions
-    unsigned char version;
+    uint8_t version;
     int digoff_init;
 
     // make sure this is nonblocking

@@ -34,7 +34,7 @@ struct rtmp_packet {
     int read;
     uint32_t timestamp;
     chunk_types chunk_type;
-    unsigned char *body;
+    uint8_t *body;
  };
 
 typedef struct rtmp {
@@ -42,8 +42,8 @@ typedef struct rtmp {
     int fd;
     int off; // handshake offset. When off == 0, signals pre-FP9 cxns
     int chunk_size; // max 65546 bytes
-    unsigned char read_buf[2600]; // TODO investigate max size
-    unsigned char write_buf[1600];
+    uint8_t read_buf[2600]; // TODO investigate max size
+    uint8_t write_buf[1600];
     struct rtmp_packet *in_channels[RTMP_CHANNELS]; // find a better way
     struct rtmp_packet *out_channels[RTMP_CHANNELS];
     ev_io read_watcher;
