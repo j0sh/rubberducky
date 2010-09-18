@@ -421,7 +421,7 @@ parse_pkt_finish:
         if (pe == p) {
             p--;
             if (r->read_cb)
-                r->read_cb(r, pkt);
+                r->read_cb(r, pkt, ctx);
             fbreak;
         }
         p--; // hideous

@@ -49,7 +49,7 @@ typedef struct rtmp {
     rtmp_packet *in_channels[RTMP_CHANNELS]; // find a better way
     rtmp_packet *out_channels[RTMP_CHANNELS];
     ev_io read_watcher;
-    void (*read_cb)(struct rtmp *r, rtmp_packet *pkt);
+    void (*read_cb)(struct rtmp *r, rtmp_packet *pkt, void *opaque);
 }rtmp;
 
 void rtmp_parser_init(rtmp *r);

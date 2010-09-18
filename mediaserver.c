@@ -175,6 +175,7 @@ static void incoming_cb(struct ev_loop *loop, ev_io *io, int revents)
     rtmp_parser_init(&client->rtmp);
     client->rtmp.fd = clientfd;
     client->rtmp.read_watcher.data = ctx;
+    client->rtmp.read_cb = rtmp_read_cb;
 
     fcntl(clientfd, F_SETFL, O_NONBLOCK);
 
