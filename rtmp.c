@@ -388,14 +388,7 @@ static uint8_t *process_packet(uint8_t *p, uint8_t *pe, ev_io *io)
         memcpy(pkt->body + pkt->read, p, chunk_size);
         pkt->read += chunk_size;
         p += chunk_size;
-        goto parse_pkt_finish; // shoot me
 
-parse_pkt_fail:
-        fprintf(stderr,
-                "Header not big enough: type %d, but %d bytes received\n",                header_type, (pe - p));
-        return NULL;
-
-parse_pkt_finish:
         fprintf(stdout, "Packet/Chunk parameters:\n"
                         "%15s %d\n%15s %d\n%15s %u\n"
                         "%15s %d\n%15s %d\n%15s 0x%x\n"
@@ -412,6 +405,12 @@ parse_pkt_finish:
     if (p == pe && r->read_cb)
         r->read_cb(r, pkt, ctx);
     return p;
+
+parse_pkt_fail:
+        fprintf(stderr,
+                "Header not big enough: type %d, but %d bytes received\n",                header_type, (pe - p));
+        return NULL;
+
     }
 
 void rtmp_read(struct ev_loop *loop, ev_io *io, int revents)
