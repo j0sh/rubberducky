@@ -72,8 +72,11 @@ int rtmp_send(rtmp *r, rtmp_packet *pkt) {
     case CHUNK_SMALL:  header_size = CHUNK_SIZE_SMALL; break;
     case CHUNK_TINY:   header_size = CHUNK_SIZE_TINY; break;
     default:
-        fprintf(stderr, "Unknown chunk type %d!\n", pkt->chunk_type);
-        goto send_error;
+        // may be hit when both conditions are met:
+        // a) pkt->chunk_type uninitialized
+        // b) packet is the first of its channel_id
+        header_size = CHUNK_SIZE_LARGE;
+        pkt->chunk_type = CHUNK_LARGE;
     }
 
     if (ts >= 0xffffff) {
