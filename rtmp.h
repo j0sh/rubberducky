@@ -28,6 +28,11 @@ typedef enum chunk_types { CHUNK_LARGE = 0,
                            CHUNK_TINY
 }chunk_types;
 
+typedef enum rtmp_state { UNINIT = 0,
+                          HANDSHAKE,
+                          READ
+}rtmp_state;
+
 typedef struct rtmp_packet {
     int chunk_id;
     int msg_id; // useless?
@@ -40,10 +45,10 @@ typedef struct rtmp_packet {
  }rtmp_packet;
 
 typedef struct rtmp {
-    int cs; // current state of the packet parser
     int fd;
     int off; // handshake offset. When off == 0, signals pre-FP9 cxns
     int chunk_size; // max 65546 bytes
+    rtmp_state state;
     uint8_t read_buf[2600]; // TODO investigate max size
     uint8_t write_buf[1600];
     rtmp_packet *in_channels[RTMP_CHANNELS]; // find a better way

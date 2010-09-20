@@ -15,6 +15,8 @@ void rtmp_init(rtmp *r)
     memset(r->out_channels, 0, sizeof(rtmp_packet*) * RTMP_CHANNELS);
     r->chunk_size = RTMP_DEFAULT_CHUNKSIZE;
     r->read_cb = NULL;
+    r->state = 0;
+    r->off = 0;
 }
 
 static void free_packet(rtmp_packet **packet) {

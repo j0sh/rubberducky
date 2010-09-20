@@ -172,7 +172,7 @@ static void incoming_cb(struct ev_loop *loop, ev_io *io, int revents)
     client->id = ctx->total_cxns++;
     client->reads = 0;
 
-    rtmp_parser_init(&client->rtmp);
+    rtmp_init(&client->rtmp);
     client->rtmp.fd = clientfd;
     client->rtmp.read_watcher.data = ctx;
     client->rtmp.read_cb = rtmp_read_cb;

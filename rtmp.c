@@ -170,21 +170,36 @@ static uint32_t get_uptime()
     return times(&t) * 1000 / clk_tck;
 }
 
-%%{
-    machine rtmp_handshake;
-    alphtype unsigned char;
+static inline rtmp* get_rtmp(ev_io *w)
+{
+    return (rtmp*)((uint8_t*)w - offsetof(rtmp, read_watcher));
+}
 
-    action unversioned_response {
-        fprintf(stdout, "Do old fashioned handshake here\n");
-    }
-
-    action versioned_response {
-        int i, *bi;
+static uint8_t *init_handshake(uint8_t *p, uint8_t *pe, ev_io *io)
+{
+    rtmp *r = get_rtmp(io);
+    int version, i, *bi;
         uint32_t uptime;
         uint8_t *b = r->write_buf, *bend = b+1+RTMP_SIG_SIZE;
         uint8_t *signature;
 
-        fprintf(stdout, "received handshake type %u \n", version);
+    // start handshaking
+    version = *p;
+    switch (version) {
+    case 0x03: break;
+    case 0x06:
+    case 0x08:
+        fprintf(stdout, "Encrypted cxns not supported!\n");
+        return NULL;
+    case 'P':
+    case 'p':
+        fprintf(stdout, "Tunnelled cxns not supported!\n");
+        return NULL;
+    default:
+        fprintf(stdout, "Unknown handshake type %d\n", version);
+        return NULL;
+    }
+    p += 1;
 
         *b++ = version;  // copy version given by client
         uptime = htonl(get_uptime());
@@ -203,11 +218,9 @@ static uint32_t get_uptime()
             *bi++ = rand();
         b = r->write_buf+1;
 
-        b = r->write_buf+1;
-
         if (p[4]) {
             // imprint key
-            r->off = get_digest_offset(b, digest_offset_values[digoff_init]);
+            r->off = get_digest_offset(b, digest_offset_values[0]);
             calc_digest(r->off, b, genuine_fms_key, 36, b+r->off);
         } else
             r->off = 0;
@@ -225,15 +238,14 @@ static uint32_t get_uptime()
         if (r->off) {
             uint8_t the_digest[SHA256_DIGEST_LENGTH];
             int off;
-            if (!(off = verify_digest(p, genuine_fp_key, 30, digoff_init))) {
+            if (!(off = verify_digest(p, genuine_fp_key, 30, 0))) {
                 fprintf(stderr, "client digest failed\n");
-                goto read_error;
+                return NULL;
             }
 
             if ((pe - p) != RTMP_SIG_SIZE) {
                 fprintf(stderr, "Client buffer not big enough\n");
-                // Perhaps the size should be checked earlier.
-                goto read_error;
+                return NULL;
             }
 
             // imprint server signature into client response
@@ -244,40 +256,17 @@ static uint32_t get_uptime()
                        SHA256_DIGEST_LENGTH, signature);
         }
         send(r->fd, p, RTMP_SIG_SIZE, 0);
-        r->cs = cs; // save state
-        fbreak;
+        return p + RTMP_SIG_SIZE;
     }
 
-    action enc {
-        version = fc;
-        digoff_init = 1;
-        p += 1;
-        // XXX '128' at the fifth byte indicates a Flash 10 session.
-        // XXX RTMPE type 8 involves XTEA encryption of the signature.
-    }
-
-    action plain {
-        version = fc;
-        digoff_init = 0;
-        p += 1;
-    }
-
-    action http {
-        fprintf(stderr, "Received POST; RTMPT unsupported.\n");
-        goto read_error;
-    }
-
-    action unsupported {
-        fprintf(stdout, "Received unsuported rtmp handshake type 0x%x\n", fc);
-        goto read_error;
-    }
-
-    action versioned_response2 {
+static uint8_t *handshake2(unsigned char *p, unsigned char *pe, ev_io *io)
+{
+    rtmp *r = get_rtmp(io);
         // second part of the handshake.
         if ((pe - p) < RTMP_SIG_SIZE) {
             fprintf(stderr, "Did not receive enough bytes from handshake response, expected %d got %d\n", RTMP_SIG_SIZE, pe - p);
             // TODO something drastic
-            goto read_error;
+            return NULL;
         }
 
         // FP9 only
@@ -293,7 +282,7 @@ static uint32_t get_uptime()
             if (memcmp(signature, &p[RTMP_SIG_SIZE - SHA256_DIGEST_LENGTH],
                        SHA256_DIGEST_LENGTH)) {
                 fprintf(stderr, "Client not genuine Adobe\n");
-                goto read_error;
+                return NULL;
             }
         }
         // we should verify the bytes returned match in pre-fp9 handshakes
@@ -302,11 +291,13 @@ static uint32_t get_uptime()
         fprintf(stdout, "Great success: client handshake successful!\n");
         p += RTMP_SIG_SIZE;
 
-        if (p == pe) fbreak;
-        p--; // process the rest. this feels brittle.
+        return p;
     }
 
-    action proc_packet {
+static uint8_t *process_packet(uint8_t *p, uint8_t *pe, ev_io *io)
+{
+    rtmp *r = get_rtmp(io);
+    srv_ctx *ctx = io->data;
         int header_type, chunk_id, chunk_size, to_increment = 0;
         rtmp_packet *pkt;
         header_type = (*p & 0xc0) >> 6;
@@ -383,7 +374,7 @@ static uint32_t get_uptime()
             }
             if (!(pkt->body = malloc(pkt->size))) {
                 fprintf(stderr, "Out of memory when allocating packet!\n");
-                goto read_error;
+                return NULL;
             }
         }
         chunk_size = r->chunk_size < (pkt->size - pkt->read) ? r->chunk_size : (pkt->size - pkt->read);
@@ -392,7 +383,7 @@ static uint32_t get_uptime()
             // Shutting down here might not always be the best idea;
             // it is very possible that our incoming packet buffer
             // was just not big enough; in that case we should enlarge it
-            goto read_error;
+            return NULL;
         }
         memcpy(pkt->body + pkt->read, p, chunk_size);
         pkt->read += chunk_size;
@@ -402,7 +393,7 @@ static uint32_t get_uptime()
 parse_pkt_fail:
         fprintf(stderr,
                 "Header not big enough: type %d, but %d bytes received\n",                header_type, (pe - p));
-        goto read_error;
+        return NULL;
 
 parse_pkt_finish:
         fprintf(stdout, "Packet/Chunk parameters:\n"
@@ -418,53 +409,16 @@ parse_pkt_finish:
                         "msg id",      pkt->msg_id,
                         "chunksize",   chunk_size);
 
-        if (pe == p) {
-            p--;
-            if (r->read_cb)
-                r->read_cb(r, pkt, ctx);
-            fbreak;
-        }
-        p--; // hideous
+    if (p == pe && r->read_cb)
+        r->read_cb(r, pkt, ctx);
+    return p;
     }
-
-    # handshake types.
-    # note that actions are executed in the order they are visited
-    rtmp = 0x03;
-    rtmpe = 0x06 | 0x08;
-    rtmpt = "post" | "POST";
-
-    transport = rtmp > plain | rtmpe > enc | rtmpt > http;
-    part1 = transport @ versioned_response | 0x0..0xff @ unsupported;
-
-    part2 = 0x0..0xff >versioned_response2;
-
-    # states of the main machine
-    handshake = part1 part2;
-    main := handshake (0x0..0xff)* $proc_packet;
-}%%
-
-%% write data;
-
-void rtmp_parser_init(rtmp *r)
-{
-    int cs = 0; // ragel specific variable
-    %% write init;
-
-    rtmp_init(r);
-    r->cs = cs;
-}
-
-static inline rtmp* get_rtmp(ev_io *w)
-{
-    return (rtmp*)((uint8_t*)w - offsetof(rtmp, read_watcher));
-}
 
 void rtmp_read(struct ev_loop *loop, ev_io *io, int revents)
 {
     uint8_t *p, *pe; // ragel specific variables
     rtmp *r = get_rtmp(io);
     srv_ctx *ctx = io->data;
-    int cs = r->cs;
 
     // locally scoped stuff thats also used within actions
     uint8_t version;
@@ -481,9 +435,25 @@ void rtmp_read(struct ev_loop *loop, ev_io *io, int revents)
     p = r->read_buf;
     pe = r->read_buf+len;
 
-    %%write exec;
+    while (p != pe) {
+        switch (r->state) {
+        case UNINIT:
+            p = init_handshake(p, pe, io);
+            if (!p) goto read_error;
+            r->state = HANDSHAKE;
+            break;
+        case HANDSHAKE:
+            p = handshake2(p, pe, io);
+            if (!p) goto read_error;
+            r->state = READ;
+            break;
+        case READ:
+            p = process_packet(p, pe, io);
+            if (!p) goto read_error;
+            break;
+        }
+    }
 
-    r->cs = cs;
     return;
 
 read_error:
