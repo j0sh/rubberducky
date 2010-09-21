@@ -46,7 +46,7 @@ SAVC(play);
 
 #define STR2AVAL(av,str)	av.av_val = str; av.av_len = strlen(av.av_val)
 
-static int send_client_bw(rtmp *rtmp)
+static int set_peer_bw(rtmp *rtmp)
 {
     uint8_t pbuf[RTMP_MAX_HEADER_SIZE+5] = {0};
     AMF_EncodeInt32(pbuf + RTMP_MAX_HEADER_SIZE, pbuf + RTMP_MAX_HEADER_SIZE + 4, 0x0fffffff);
@@ -394,7 +394,7 @@ void rtmp_invoke(rtmp *rtmp, rtmp_packet *pkt, srv_ctx *ctx)
 
     if(AVMATCH(&method, &av_connect))
     {
-        send_client_bw(rtmp);
+        set_peer_bw(rtmp);
         send_ping(rtmp);
         send_onbw_done(rtmp);
         handle_connect(rtmp, pkt, &obj);
