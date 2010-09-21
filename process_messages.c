@@ -48,7 +48,9 @@ SAVC(play);
 
 static int send_client_bw(rtmp *rtmp)
 {
-    uint8_t pbuf[RTMP_MAX_HEADER_SIZE+4] = {0};
+    uint8_t pbuf[RTMP_MAX_HEADER_SIZE+5] = {0};
+    AMF_EncodeInt32(pbuf + RTMP_MAX_HEADER_SIZE, pbuf + RTMP_MAX_HEADER_SIZE + 4, 0x0fffffff);
+    pbuf[RTMP_MAX_HEADER_SIZE + 4] = 2;
     rtmp_packet packet = {
         .chunk_id = 0x02,
         .msg_id = 0,
