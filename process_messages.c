@@ -59,18 +59,30 @@ static int set_peer_bw(rtmp *rtmp)
         .size = sizeof(pbuf) - RTMP_MAX_HEADER_SIZE,
         .body = pbuf + RTMP_MAX_HEADER_SIZE
     };
+    fprintf(stdout, "sending clientbw, rx: %d, tx %d\n", rtmp->rx, rtmp->tx);
+    return rtmp_send(rtmp, &packet);
+}
+
+static int window_ack_size(rtmp *rtmp)
+{
+    uint8_t pbuf[RTMP_MAX_HEADER_SIZE + 4] = { 0 };
+    AMF_EncodeInt32(pbuf + RTMP_MAX_HEADER_SIZE, pbuf + RTMP_MAX_HEADER_SIZE + 4, 0x0fffffff);
+    rtmp_packet packet = {
+        .chunk_id = 0x02,
+        .msg_id = 0,
+        .msg_type = 0x05,
+        .timestamp = 0,
+        .size = sizeof(pbuf) - RTMP_MAX_HEADER_SIZE,
+        .body = pbuf + RTMP_MAX_HEADER_SIZE
+    };
     return rtmp_send(rtmp, &packet);
 }
 
 static int send_ping(rtmp *rtmp)
 {
     time_t now = time(NULL);
-    // assumes little endian ordering
     uint8_t pbuf[RTMP_MAX_HEADER_SIZE+4];
-    pbuf[RTMP_MAX_HEADER_SIZE+0] = now;
-    pbuf[RTMP_MAX_HEADER_SIZE+1] = now >>  8;
-    pbuf[RTMP_MAX_HEADER_SIZE+2] = now >> 16;
-    pbuf[RTMP_MAX_HEADER_SIZE+3] = now >> 24;
+    AMF_EncodeInt32(pbuf + RTMP_MAX_HEADER_SIZE, pbuf + sizeof(pbuf), now);
     memset(pbuf, 0, RTMP_MAX_HEADER_SIZE);
     rtmp_packet packet = {
         .chunk_id = 0x02,
@@ -394,6 +406,7 @@ void rtmp_invoke(rtmp *rtmp, rtmp_packet *pkt, srv_ctx *ctx)
 
     if(AVMATCH(&method, &av_connect))
     {
+        window_ack_size(rtmp);
         set_peer_bw(rtmp);
         send_ping(rtmp);
         send_onbw_done(rtmp);
