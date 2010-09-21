@@ -75,7 +75,7 @@ static int send_ping(rtmp *rtmp)
     rtmp_packet packet = {
         .chunk_id = 0x02,
         .msg_id = 0,
-        .msg_type = 0x06,
+        .msg_type = 0x04,
         .timestamp = 0,
         .size = sizeof(pbuf) - RTMP_MAX_HEADER_SIZE,
         .body = pbuf + RTMP_MAX_HEADER_SIZE
