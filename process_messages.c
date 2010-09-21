@@ -108,7 +108,7 @@ static int send_onbw_done(rtmp *rtmp)
     // i have never actually seen a flash client make use of this.
     SAVC(onBWDone);
     uint8_t pbuf[128], *end = pbuf+sizeof(pbuf), *enc = pbuf+RTMP_MAX_HEADER_SIZE, *foo;
-    enc = AMF_EncodeString(pbuf, end, &av_onBWDone);
+    enc = AMF_EncodeString(enc, end, &av_onBWDone);
     enc = AMF_EncodeNumber(enc, end, 0);
     *enc++ = AMF_NULL; // command object
     foo = pbuf+RTMP_MAX_HEADER_SIZE;
