@@ -404,8 +404,10 @@ static uint8_t *process_packet(uint8_t *p, uint8_t *pe, ev_io *io)
                         "msg id",      pkt->msg_id,
                         "chunksize",   chunk_size);
 
-    if (p == pe && r->read_cb)
+    if (pkt->read == pkt->size && r->read_cb) {
         r->read_cb(r, pkt, ctx);
+        pkt->read = 0;
+    }
     return p;
 
 parse_pkt_fail:
