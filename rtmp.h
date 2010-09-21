@@ -48,6 +48,8 @@ typedef struct rtmp {
     int fd;
     int off; // handshake offset. When off == 0, signals pre-FP9 cxns
     int chunk_size; // max 65546 bytes
+    uint32_t rx;
+    uint32_t tx;
     rtmp_state state;
     uint8_t read_buf[2600]; // TODO investigate max size
     uint8_t write_buf[1600];

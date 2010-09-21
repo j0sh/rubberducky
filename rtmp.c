@@ -226,6 +226,7 @@ static uint8_t *init_handshake(uint8_t *p, uint8_t *pe, ev_io *io)
             r->off = 0;
 
         send(r->fd, r->write_buf, (bend - r->write_buf), 0);
+        r->tx += bend - r->write_buf;
 
         // decode client request
         memcpy(&uptime, p, 4);
@@ -256,6 +257,7 @@ static uint8_t *init_handshake(uint8_t *p, uint8_t *pe, ev_io *io)
                        SHA256_DIGEST_LENGTH, signature);
         }
         send(r->fd, p, RTMP_SIG_SIZE, 0);
+        r->tx += RTMP_SIG_SIZE;
         return p + RTMP_SIG_SIZE;
     }
 
@@ -435,6 +437,7 @@ void rtmp_read(struct ev_loop *loop, ev_io *io, int revents)
     pe = r->read_buf+len;
 
     while (p != pe) {
+        uint8_t *q = p;
         switch (r->state) {
         case UNINIT:
             p = init_handshake(p, pe, io);
@@ -451,6 +454,7 @@ void rtmp_read(struct ev_loop *loop, ev_io *io, int revents)
             if (!p) goto read_error;
             break;
         }
+        r->rx += p - q;
     }
 
     return;

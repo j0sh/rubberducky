@@ -17,6 +17,8 @@ void rtmp_init(rtmp *r)
     r->read_cb = NULL;
     r->state = 0;
     r->off = 0;
+    r->rx = 0;
+    r->tx = 0;
 }
 
 static void free_packet(rtmp_packet **packet) {
@@ -148,7 +150,8 @@ int rtmp_send(rtmp *r, rtmp_packet *pkt) {
     }
     memcpy(r->out_channels[pkt->chunk_id], pkt, sizeof(rtmp_packet));
     r->out_channels[pkt->chunk_id]->body = NULL; // dont store for outbound
-    return 0; // maybe should be # of bytes written
+    r->tx += chunk_header_size + header_size + to_write;
+    return chunk_header_size + header_size + to_write;
 
 send_error:
     return -1; //XXX do something drastic
