@@ -320,7 +320,7 @@ static void handle_connect(rtmp *rtmp, rtmp_packet *pkt, AMFObject *obj)
                     {
                         //rtmp->Link.protocol = RTMP_PROTOCOL_RTMP;
                         r1 = pval.av_val+7;
-                    } else if('e' == (pval.av_val[0] | 0x40) &&
+                    } else if('e' == (pval.av_val[4] | 0x40) &&
                               ':' == pval.av_val[5])
                     {
                         //rtmp->Link.protocol = RTMP_PROTOCOL_RTMPE;
