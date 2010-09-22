@@ -119,10 +119,10 @@ int rtmp_send(rtmp *r, rtmp_packet *pkt) {
         // encode chunk header
         // XXX bencmark this fragment against librtmp
         header = start;
-        *header = (pkt->chunk_type << 6); // should chunk_type be reset?
+        *header = (pkt->chunk_type << 6);
         switch (chunk_header_size) {
         case 1:
-            *header = pkt->chunk_id;
+            *header |= pkt->chunk_id;
             break;
         case 3:
             *header |= 1;
@@ -138,6 +138,7 @@ int rtmp_send(rtmp *r, rtmp_packet *pkt) {
         to_write -= chunk_size;
         body     += chunk_size;
         start     = body - chunk_header_size;
+        pkt->chunk_type = CHUNK_TINY;
     }
 
     if (!r->out_channels[pkt->chunk_id]) {
