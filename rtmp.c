@@ -216,7 +216,7 @@ static int init_handshake(ev_io *io)
     p += 1;
 
     if (pe - p < RTMP_SIG_SIZE) {
-        fprintf(stderr, "Failed to receive enough data in handshake: %d bytes expected, %d received", read_size, pe - p);
+        fprintf(stderr, "Failed to receive enough data in handshake: %d bytes expected, %td received\n", read_size, pe - p);
         return RTMPERR(INVALIDDATA);
     }
 
@@ -297,7 +297,7 @@ static int handshake2(ev_io *io)
 
         // second part of the handshake.
         if ((pe - p) < RTMP_SIG_SIZE) {
-            fprintf(stderr, "Did not receive enough bytes from handshake response, expected %d got %d\n", RTMP_SIG_SIZE, pe - p);
+            printf("Did not receive enough bytes from handshake response, expected %d got %td\n", RTMP_SIG_SIZE, pe - p);
         return RTMPERR(ENOMEM);
         }
 
@@ -488,7 +488,7 @@ static int process_packet(ev_io *io)
 
 parse_pkt_fail:
         fprintf(stderr,
-                "Header not big enough: type %d, but %d bytes received\n",                header_type, (pe - p));
+                "Header not big enough: type %d, but %td bytes received\n",                header_type, (pe - p));
         return RTMPERR(INVALIDDATA);
 
     }
