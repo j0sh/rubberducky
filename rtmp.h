@@ -61,6 +61,8 @@ typedef struct rtmp {
     uint8_t write_buf[1600];
     int bytes_waiting;
 
+    int chunk_alignment;
+
     rtmp_packet *in_channels[RTMP_CHANNELS]; // find a better way
     rtmp_packet *out_channels[RTMP_CHANNELS];
     ev_io read_watcher;

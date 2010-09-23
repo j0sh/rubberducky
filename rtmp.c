@@ -187,15 +187,26 @@ static int init_handshake(ev_io *io)
     int len, version, i, *bi, read_size = RTMP_SIG_SIZE + 1;
         uint32_t uptime;
     uint8_t *b = r->write_buf, *bend = b+read_size, *signature;
-    uint8_t *p = malloc(read_size), *pe;
+    uint8_t *p, *pe;
+    rtmp_packet *pkt = r->in_channels[0];
 
-    if (!p) {
-        fprintf(stderr, "Not enough memory for first part of handshake.");
-        return RTMPERR(ENOMEM);
+    // by convention, we use chunk id 0 for the handshake
+    if (!pkt) {
+        pkt = malloc(sizeof(rtmp_packet));
+        if (!pkt) return RTMPERR(ENOMEM);
+        memset(pkt, 0, sizeof(rtmp_packet));
+        pkt->size = read_size;
+        pkt->body = malloc(read_size);
+        if (!pkt->body) return RTMPERR(ENOMEM);
+        pkt->size = read_size;
+        r->in_channels[0] = pkt;
     }
-    if ((len = read_bytes(r, p, read_size)) <= 0)
+    p = pkt->body;
+
+    if ((len = read_bytes(r, p + pkt->read, read_size)) <= 0)
         return RTMPERR(errno);
-    pe  = p + len;
+    pkt->read += len;
+    pe  = p + pkt->read;
 
     // start handshaking
     version = *p;
@@ -216,8 +227,9 @@ static int init_handshake(ev_io *io)
     p += 1;
 
     if (pe - p < RTMP_SIG_SIZE) {
-        fprintf(stderr, "Failed to receive enough data in handshake: %d bytes expected, %td received\n", read_size, pe - p);
-        return RTMPERR(INVALIDDATA);
+        // we probably haven't received enough data on the wire yet since
+        // RTMP_SIG_SIZE is larger than the TCP data MTU
+        return RTMPERR(EAGAIN);
     }
 
         *b++ = version;  // copy version given by client
@@ -277,7 +289,7 @@ static int init_handshake(ev_io *io)
         }
         send(r->fd, p, RTMP_SIG_SIZE, 0);
         r->tx += RTMP_SIG_SIZE;
-        free(p - 1); // move back to include version byte
+        pkt->read = 0; // this bookkeping sucks. fix.
         return read_size;
     }
 
@@ -285,20 +297,22 @@ static int handshake2(ev_io *io)
 {
     rtmp *r = get_rtmp(io);
     int len;
+    rtmp_packet *pkt = r->in_channels[0];
+    uint8_t *p = pkt->body, *pe;
 
-    uint8_t *p = malloc(RTMP_SIG_SIZE), *pe;
-    if (!p) {
-        fprintf(stderr, "Out of memory in 2nd part of handshake.\n");
-        return RTMPERR(ENOMEM);
+    if (!pkt || !pkt->body || pkt->size < RTMP_SIG_SIZE) {
+        fprintf(stderr, "Something weird is going on: packet nonexistent "                         "in second part of handshake\n");
+        return RTMPERR(INVALIDDATA);
     }
-    if ((len = read_bytes(r, p, RTMP_SIG_SIZE)) <= 0)
+
+    if ((len = read_bytes(r, p + pkt->read, RTMP_SIG_SIZE)) <= 0)
         return RTMPERR(errno);
-    pe  = p + len;
+    pkt->read += len;
+    pe  = p + pkt->read;
 
         // second part of the handshake.
         if ((pe - p) < RTMP_SIG_SIZE) {
-            printf("Did not receive enough bytes from handshake response, expected %d got %td\n", RTMP_SIG_SIZE, pe - p);
-        return RTMPERR(ENOMEM);
+        return RTMPERR(EAGAIN);
         }
 
         // FP9 only
@@ -351,14 +365,27 @@ static int process_packet(ev_io *io)
         memcpy(p, r->write_buf, r->bytes_waiting);
         p += r->bytes_waiting;
 
+        if (!r->chunk_alignment) { // in this case, don't attempt to readahead
         if ((len = read_bytes(r, p, sizeof(hdr) - r->bytes_waiting)) < 0) {
             fprintf(stderr, "ZOMGBROKEN\n");
             return RTMPERR(errno);
         }
         len += r->bytes_waiting;
+        }
         r->bytes_waiting = 0;
 
     }
+
+    if (len != sizeof(hdr) && !r->chunk_alignment) {
+        // EAGAIN'd while reading the header. c'est la vie
+        // note if we are trying to reset chunk alignment, we don't fill in
+        // the header buffer, hence in that case len always != sizeof(hdr)
+        memcpy(r->write_buf, hdr, len);
+        r->bytes_waiting = len;
+        fprintf(stderr, "EAGAIN'd while reading header :( %d\n", len);
+        return RTMPERR(EAGAIN);
+    }
+
     p    = hdr;
     pe   = p + len;
 
@@ -440,6 +467,7 @@ static int process_packet(ev_io *io)
             }
         }
         chunk_size = r->chunk_size < (pkt->size - pkt->read) ? r->chunk_size : (pkt->size - pkt->read);
+    if (!r->chunk_alignment) {
     // copy over any data leftover from header buffer
     leftover = len - (p - hdr);
     chunk_size -= leftover;
@@ -449,14 +477,39 @@ static int process_packet(ev_io *io)
         r->bytes_waiting = -chunk_size;
         chunk_size = 0;
     }
-    //printf("id %d diff %d, chunksize %d, read %d, remaining %d, sum %d, size %d sad flag %d\n", pkt->chunk_id, leftover, chunk_size, pkt->read, pkt->size -  pkt->read, pkt->read + chunk_size + leftover, pkt->size, sad_flag);
+    //printf("id %d diff %d, chunksize %d, read %d, remaining %d, sum %d, size %d next pkt bytes %d\n", pkt->chunk_id, leftover, chunk_size, pkt->read, pkt->size -  pkt->read, pkt->read + chunk_size + leftover, pkt->size, r->bytes_waiting);
+    // candidate for synthetic microbenchmarking against a while loop
     memcpy(pkt->body + pkt->read, p, leftover);
     p         += leftover;
     pkt->read += leftover;
+    } else {
+        chunk_size = r->chunk_alignment;
+	r->chunk_alignment = 0;
+    }
 
-    if (chunk_size && (len = read_bytes(r, pkt->body + pkt->read, chunk_size)) <= 0) {
+    if (chunk_size) {
+	    if ((len = read_bytes(r, pkt->body + pkt->read, chunk_size)) <= 0) {
+	        if (errno == EAGAIN) // should do this for all other recvs too
+	            len = 0;
+	        else {
         fprintf(stderr, "Error reading bytes!\n");
         return RTMPERR(errno);
+	        }
+	}
+	// chunks should be forbidden on packet boundaries. bah.
+    if (len != chunk_size) {
+        r->chunk_alignment = chunk_size - len; 
+        pkt->read += len;
+        // a hideous hack:
+        // fake a chunk type of 3 and copy the chunk header
+        p = r->write_buf;
+        *p++ = (3 << 6) | (hdr[0] & 0x3f);
+        *p++ = hdr[1];
+        *p++ = hdr[2];
+        r->bytes_waiting = 3;
+        fprintf(stderr, "hideousness suppressed: %d left\n", chunk_size - len);
+        return RTMPERR(EAGAIN);
+	}
     } else if (r->bytes_waiting) {
         // we copied way too much in the header and spilled over
         // into the next packet; save the leftover leftover bytes
@@ -502,17 +555,17 @@ void rtmp_read(struct ev_loop *loop, ev_io *io, int revents)
         switch (r->state) {
         case UNINIT:
             bytes_read = init_handshake(io);
-            r->state = HANDSHAKE;
+            if (RTMPERR(EAGAIN) != bytes_read) r->state = HANDSHAKE;
             break;
         case HANDSHAKE:
             bytes_read = handshake2(io);
-            r->state = READ;
+            if (RTMPERR(EAGAIN) != bytes_read) r->state = READ;
             break;
         case READ:
             bytes_read = process_packet(io);
             break;
         }
-        if (bytes_read <= 0) goto read_error;
+        if (bytes_read <= 0 && bytes_read != RTMPERR(EAGAIN)) goto read_error;
         r->rx += bytes_read;
 
     return;
