@@ -99,6 +99,7 @@ static int send_ping(rtmp *rtmp)
 static int send_result(rtmp *rtmp, double txn, double stream_id)
 {
     uint8_t pbuf[128], *end = pbuf+sizeof(pbuf), *enc = pbuf+RTMP_MAX_HEADER_SIZE, *foo;
+    memset(pbuf, 0, RTMP_MAX_HEADER_SIZE);
     enc = AMF_EncodeString(enc, end, &av__result);
     enc = AMF_EncodeNumber(enc, end, txn);
     *enc++ = AMF_NULL; //command object
@@ -120,6 +121,7 @@ static int send_onbw_done(rtmp *rtmp)
     // i have never actually seen a flash client make use of this.
     SAVC(onBWDone);
     uint8_t pbuf[128], *end = pbuf+sizeof(pbuf), *enc = pbuf+RTMP_MAX_HEADER_SIZE, *foo;
+    memset(pbuf, 0, RTMP_MAX_HEADER_SIZE); // to shut up valgrind
     enc = AMF_EncodeString(enc, end, &av_onBWDone);
     enc = AMF_EncodeNumber(enc, end, 0);
     *enc++ = AMF_NULL; // command object
@@ -139,11 +141,13 @@ static int send_cxn_resp(rtmp *rtmp, double txn)
 {
     rtmp_packet packet;
   uint8_t pbuf[384], *pend = pbuf+sizeof(pbuf), *enc;
+    memset(pbuf, 0, RTMP_MAX_HEADER_SIZE);
   AMFObject obj;
   AMFObjectProperty p, op;
   AVal av;
 
     packet.chunk_id = 0x03; // control channel
+    packet.chunk_type = CHUNK_MEDIUM;
     packet.msg_type = 0x14;
     packet.msg_id = 0;
     packet.timestamp = 0;
@@ -196,6 +200,7 @@ static int send_fcpublish(rtmp *rtmp, AVal *streamname,
                           double txn, stream_cmd action)
 {
     uint8_t pbuf[256], *end = pbuf+sizeof(pbuf), *enc = pbuf+RTMP_MAX_HEADER_SIZE, *foo;
+    memset(pbuf, 0, RTMP_MAX_HEADER_SIZE);
     AVal key, value;
     switch (action) {
     case publish:
@@ -240,6 +245,7 @@ static int send_onstatus(rtmp *rtmp, AVal *streamname, stream_cmd action)
 {
     uint8_t pbuf[256], *end = pbuf+sizeof(pbuf), *enc = pbuf+RTMP_MAX_HEADER_SIZE, *foo;
     uint8_t tbuf[64], pubstr[64]; //XXX this might not be enough later on
+    memset(pbuf, 0, RTMP_MAX_HEADER_SIZE);
     AVal key, value;
     STR2AVAL(value, "onStatus");
     enc = AMF_EncodeString(enc, end, &value);

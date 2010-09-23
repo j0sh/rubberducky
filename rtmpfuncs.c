@@ -6,6 +6,7 @@
 #include <stdio.h>
 
 #include <sys/socket.h>
+#include <unistd.h>
 
 #include <librtmp/amf.h>
 
@@ -55,10 +56,11 @@ int rtmp_send(rtmp *r, rtmp_packet *pkt) {
             prev->msg_type == pkt->msg_type &&
             CHUNK_MEDIUM == pkt->chunk_type) {
             pkt->chunk_type = CHUNK_SMALL;
-        }
-        if (prev->timestamp == pkt->timestamp &&
+        } else if (prev->timestamp == pkt->timestamp &&
             CHUNK_SMALL == pkt->chunk_type) {
             pkt->chunk_type = CHUNK_TINY;
+        } else {
+            pkt->chunk_type = CHUNK_MEDIUM;
         }
         ts -= prev->timestamp;
     }

@@ -13,6 +13,7 @@
 
 /* lib includes */
 #include <librtmp/log.h>
+#include <librtmp/amf.h>
 #include <ev.h>
 
 /* local includes */
