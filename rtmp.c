@@ -1,4 +1,5 @@
 /* system includes */
+#include <errno.h>
 #include <stdio.h>
 #include <string.h>
 #include <stddef.h>
@@ -175,13 +176,26 @@ static inline rtmp* get_rtmp(ev_io *w)
     return (rtmp*)((uint8_t*)w - offsetof(rtmp, read_watcher));
 }
 
-static uint8_t *init_handshake(uint8_t *p, uint8_t *pe, ev_io *io)
+static int read_bytes(rtmp *r, uint8_t *p, int howmany)
+{
+    return recv(r->fd, p, howmany, 0);
+}
+
+static int init_handshake(ev_io *io)
 {
     rtmp *r = get_rtmp(io);
-    int version, i, *bi;
+    int len, version, i, *bi, read_size = RTMP_SIG_SIZE + 1;
         uint32_t uptime;
-        uint8_t *b = r->write_buf, *bend = b+1+RTMP_SIG_SIZE;
-        uint8_t *signature;
+    uint8_t *b = r->write_buf, *bend = b+read_size, *signature;
+    uint8_t *p = malloc(read_size), *pe;
+
+    if (!p) {
+        fprintf(stderr, "Not enough memory for first part of handshake.");
+        return RTMPERR(ENOMEM);
+    }
+    if ((len = read_bytes(r, p, read_size)) <= 0)
+        return RTMPERR(errno);
+    pe  = p + len;
 
     // start handshaking
     version = *p;
@@ -190,16 +204,21 @@ static uint8_t *init_handshake(uint8_t *p, uint8_t *pe, ev_io *io)
     case 0x06:
     case 0x08:
         fprintf(stdout, "Encrypted cxns not supported!\n");
-        return NULL;
+        return RTMPERR(ENOSYS);
     case 'P':
     case 'p':
         fprintf(stdout, "Tunnelled cxns not supported!\n");
-        return NULL;
+        return RTMPERR(ENOSYS);
     default:
         fprintf(stdout, "Unknown handshake type %d\n", version);
-        return NULL;
+        return RTMPERR(INVALIDDATA);
     }
     p += 1;
+
+    if (pe - p < RTMP_SIG_SIZE) {
+        fprintf(stderr, "Failed to receive enough data in handshake: %d bytes expected, %d received", read_size, pe - p);
+        return RTMPERR(INVALIDDATA);
+    }
 
         *b++ = version;  // copy version given by client
         uptime = htonl(get_uptime());
@@ -241,12 +260,12 @@ static uint8_t *init_handshake(uint8_t *p, uint8_t *pe, ev_io *io)
             int off;
             if (!(off = verify_digest(p, genuine_fp_key, 30, 0))) {
                 fprintf(stderr, "client digest failed\n");
-                return NULL;
+                return RTMPERR(INVALIDDATA);
             }
 
             if ((pe - p) != RTMP_SIG_SIZE) {
                 fprintf(stderr, "Client buffer not big enough\n");
-                return NULL;
+                return RTMPERR(INVALIDDATA);
             }
 
             // imprint server signature into client response
@@ -258,17 +277,28 @@ static uint8_t *init_handshake(uint8_t *p, uint8_t *pe, ev_io *io)
         }
         send(r->fd, p, RTMP_SIG_SIZE, 0);
         r->tx += RTMP_SIG_SIZE;
-        return p + RTMP_SIG_SIZE;
+        free(p - 1); // move back to include version byte
+        return read_size;
     }
 
-static uint8_t *handshake2(unsigned char *p, unsigned char *pe, ev_io *io)
+static int handshake2(ev_io *io)
 {
     rtmp *r = get_rtmp(io);
+    int len;
+
+    uint8_t *p = malloc(RTMP_SIG_SIZE), *pe;
+    if (!p) {
+        fprintf(stderr, "Out of memory in 2nd part of handshake.\n");
+        return RTMPERR(ENOMEM);
+    }
+    if ((len = read_bytes(r, p, RTMP_SIG_SIZE)) <= 0)
+        return RTMPERR(errno);
+    pe  = p + len;
+
         // second part of the handshake.
         if ((pe - p) < RTMP_SIG_SIZE) {
             fprintf(stderr, "Did not receive enough bytes from handshake response, expected %d got %d\n", RTMP_SIG_SIZE, pe - p);
-            // TODO something drastic
-            return NULL;
+        return RTMPERR(ENOMEM);
         }
 
         // FP9 only
@@ -284,24 +314,54 @@ static uint8_t *handshake2(unsigned char *p, unsigned char *pe, ev_io *io)
             if (memcmp(signature, &p[RTMP_SIG_SIZE - SHA256_DIGEST_LENGTH],
                        SHA256_DIGEST_LENGTH)) {
                 fprintf(stderr, "Client not genuine Adobe\n");
-                return NULL;
+                return RTMPERR(INVALIDDATA);
             }
         }
         // we should verify the bytes returned match in pre-fp9 handshakes
         // but: Postel's Law.
 
         fprintf(stdout, "Great success: client handshake successful!\n");
-        p += RTMP_SIG_SIZE;
-
-        return p;
+        free(p);
+        return RTMP_SIG_SIZE;
     }
 
-static uint8_t *process_packet(uint8_t *p, uint8_t *pe, ev_io *io)
+static int process_packet(ev_io *io)
 {
     rtmp *r = get_rtmp(io);
     srv_ctx *ctx = io->data;
-        int header_type, chunk_id, chunk_size, to_increment = 0;
+    int len, leftover, header_type, chunk_id, chunk_size, to_increment = 0;
         rtmp_packet *pkt;
+    uint8_t *p, *pe;
+    uint8_t hdr[RTMP_MAX_HEADER_SIZE];
+
+    if (!r->bytes_waiting) {
+        // overread the header a little and copy the rest later on.
+        // saves having to recv() each byte as we need it
+        // THIS WILL BITE US IN THE ASS:
+        // if we have a very small chunk (say, 4 bytes)
+        // then we will likely be reading into the next packet.
+        // RECOVER THOSE BYTES (done below)
+        if ((len = read_bytes(r, hdr, sizeof(hdr))) <= 0) {
+            fprintf(stderr, "Error in reading headers!\n");
+            return RTMPERR(errno);
+        }
+    } else {
+        // we got bit in the ass: recover header bytes for current packet
+        p = hdr;
+        memcpy(p, r->write_buf, r->bytes_waiting);
+        p += r->bytes_waiting;
+
+        if ((len = read_bytes(r, p, sizeof(hdr) - r->bytes_waiting)) < 0) {
+            fprintf(stderr, "ZOMGBROKEN\n");
+            return RTMPERR(errno);
+        }
+        len += r->bytes_waiting;
+        r->bytes_waiting = 0;
+
+    }
+    p    = hdr;
+    pe   = p + len;
+
         header_type = (*p & 0xc0) >> 6;
         chunk_id = *p & 0x3f;
         p += 1;
@@ -321,7 +381,7 @@ static uint8_t *process_packet(uint8_t *p, uint8_t *pe, ev_io *io)
         } else {
             if(!(pkt = malloc(sizeof(rtmp_packet)))) {
                 fprintf(stderr, "Failed to malloc space for packet!\n");
-                // XXX error out
+            return RTMPERR(ENOMEM);
             }
             memset(pkt, 0, sizeof(rtmp_packet)); // zero out
             pkt->chunk_id = chunk_id;
@@ -376,21 +436,37 @@ static uint8_t *process_packet(uint8_t *p, uint8_t *pe, ev_io *io)
             }
             if (!(pkt->body = malloc(pkt->size))) {
                 fprintf(stderr, "Out of memory when allocating packet!\n");
-                return NULL;
+            return RTMPERR(ENOMEM);
             }
         }
         chunk_size = r->chunk_size < (pkt->size - pkt->read) ? r->chunk_size : (pkt->size - pkt->read);
-        if (p+chunk_size > pe) {
-            fprintf(stdout, "Error: overreading p\n");
-            // Shutting down here might not always be the best idea;
-            // it is very possible that our incoming packet buffer
-            // was just not big enough; in that case we should enlarge it
-            return NULL;
-        }
-        memcpy(pkt->body + pkt->read, p, chunk_size);
-        pkt->read += chunk_size;
-        p += chunk_size;
+    // copy over any data leftover from header buffer
+    leftover = len - (p - hdr);
+    chunk_size -= leftover;
+    if (chunk_size < 0) {
+        // we fucked up and overread into the next packet
+        leftover += chunk_size;
+        r->bytes_waiting = -chunk_size;
+        chunk_size = 0;
+    }
+    //printf("id %d diff %d, chunksize %d, read %d, remaining %d, sum %d, size %d sad flag %d\n", pkt->chunk_id, leftover, chunk_size, pkt->read, pkt->size -  pkt->read, pkt->read + chunk_size + leftover, pkt->size, sad_flag);
+    memcpy(pkt->body + pkt->read, p, leftover);
+    p         += leftover;
+    pkt->read += leftover;
 
+    if (chunk_size && (len = read_bytes(r, pkt->body + pkt->read, chunk_size)) <= 0) {
+        fprintf(stderr, "Error reading bytes!\n");
+        return RTMPERR(errno);
+    } else if (r->bytes_waiting) {
+        // we copied way too much in the header and spilled over
+        // into the next packet; save the leftover leftover bytes
+        // into a temp buffer
+        // XXX probably should verify size of write_buf!
+        memcpy(r->write_buf, p, r->bytes_waiting);
+    }
+        pkt->read += chunk_size;
+
+   /*
         fprintf(stdout, "Packet/Chunk parameters:\n"
                         "%15s %d\n%15s %d\n%15s %u\n"
                         "%15s %d\n%15s %d\n%15s 0x%x\n"
@@ -403,66 +479,46 @@ static uint8_t *process_packet(uint8_t *p, uint8_t *pe, ev_io *io)
                         "msg type",    pkt->msg_type,
                         "msg id",      pkt->msg_id,
                         "chunksize",   chunk_size);
-
+    */
     if (pkt->read == pkt->size && r->read_cb) {
         r->read_cb(r, pkt, ctx);
         pkt->read = 0;
     }
-    return p;
+    return chunk_size + leftover + to_increment; // missing chunk id
 
 parse_pkt_fail:
         fprintf(stderr,
                 "Header not big enough: type %d, but %d bytes received\n",                header_type, (pe - p));
-        return NULL;
+        return RTMPERR(INVALIDDATA);
 
     }
 
 void rtmp_read(struct ev_loop *loop, ev_io *io, int revents)
 {
-    uint8_t *p, *pe; // ragel specific variables
     rtmp *r = get_rtmp(io);
     srv_ctx *ctx = io->data;
+    int bytes_read;
 
-    // locally scoped stuff thats also used within actions
-    uint8_t version;
-    int digoff_init;
-
-    // make sure this is nonblocking
-    int len = recv(r->fd, r->read_buf, sizeof(r->read_buf), 0);
-    if (!len)
-    {
-        fprintf(stderr, "Bad read\n");
-        goto read_error;
-    }
-
-    p = r->read_buf;
-    pe = r->read_buf+len;
-
-    while (p != pe) {
-        uint8_t *q = p;
         switch (r->state) {
         case UNINIT:
-            p = init_handshake(p, pe, io);
-            if (!p) goto read_error;
+            bytes_read = init_handshake(io);
             r->state = HANDSHAKE;
             break;
         case HANDSHAKE:
-            p = handshake2(p, pe, io);
-            if (!p) goto read_error;
+            bytes_read = handshake2(io);
             r->state = READ;
             break;
         case READ:
-            p = process_packet(p, pe, io);
-            if (!p) goto read_error;
+            bytes_read = process_packet(io);
             break;
         }
-        r->rx += p - q;
-    }
+        if (bytes_read <= 0) goto read_error;
+        r->rx += bytes_read;
 
     return;
 
 read_error:
-    fprintf(stderr, "Disconnecting fd %d\n", r->fd);
+    fprintf(stderr, "Error %d, disconnecting fd %d \n", bytes_read, r->fd);
     ev_io_stop(ctx->loop, io);
     close(r->fd);
 }

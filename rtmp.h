@@ -56,8 +56,11 @@ typedef struct rtmp {
     uint32_t rx;
     uint32_t tx;
     rtmp_state state;
-    uint8_t read_buf[2600]; // TODO investigate max size
+
+    // write buffer
     uint8_t write_buf[1600];
+    int bytes_waiting;
+
     rtmp_packet *in_channels[RTMP_CHANNELS]; // find a better way
     rtmp_packet *out_channels[RTMP_CHANNELS];
     ev_io read_watcher;
