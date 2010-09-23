@@ -4,6 +4,11 @@
 #include <stdint.h>
 #include <ev.h>
 
+#define MKTAG(a, b, c, d) ((a) | ((b) << 8) | ((c) << 16) | ((d) << 24))
+
+#define RTMPERR(error) -error
+#define INVALIDDATA MKTAG('I','N','V','L')
+
 // emulated things
 #define FMS_VER_MAJOR 3
 #define FMS_VER_MINOR 5
