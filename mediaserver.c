@@ -138,11 +138,20 @@ static void rtmp_read_cb(rtmp *r, struct rtmp_packet *pkt, void *opaque)
 {
     srv_ctx *ctx = (srv_ctx*)opaque;
     switch(pkt->msg_type) {
+    case 0x03:
+        fprintf(stdout, "Ack: %d Bytes Read\n", AMF_DecodeInt32(pkt->body));
+        break;
+    case 0x05:
+        fprintf(stdout, "Set Ack Size: %d\n", AMF_DecodeInt32(pkt->body));
+        break;
+    case 0x08:
+    case 0x09:
+        break; // audio and video
     case 0x14:
         rtmp_invoke(r, pkt, ctx);
         break;
     default:
-        fprintf(stdout, "default in cb\n");
+        fprintf(stdout, "default in cb: %d\n", pkt->msg_type);
     }
 }
 
