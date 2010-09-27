@@ -376,24 +376,21 @@ static int process_packet(ev_io *io)
 
     }
 
-    if (len != sizeof(hdr) && !r->chunk_alignment) {
-        // EAGAIN'd while reading the header. c'est la vie
-        // note if we are trying to reset chunk alignment, we don't fill in
-        // the header buffer, hence in that case len always != sizeof(hdr)
-        memcpy(r->write_buf, hdr, len);
-        r->bytes_waiting = len;
-        fprintf(stderr, "EAGAIN'd while reading header :( %d\n", len);
-        return RTMPERR(EAGAIN);
-    }
-
     p    = hdr;
     pe   = p + len;
 
+    if ((pe - p) < 1)
+        goto parse_pkt_fail;
         header_type = (*p & 0xc0) >> 6;
         chunk_id = *p & 0x3f;
         p += 1;
 
-        // TODO bounds checking
+    if ((chunk_id > 319 && (pe - p) < 2) ||
+       (chunk_id > 64 && (pe - p) < 1)) {
+        fprintf(stderr, "this weird condition: chunk id %d, length %d\n",
+                chunk_id, pe - p);
+        goto parse_pkt_fail;
+    }
         if (!chunk_id) {
             chunk_id = *p + 64;
             p += 1;
@@ -540,9 +537,11 @@ static int process_packet(ev_io *io)
     return chunk_size + leftover + to_increment; // missing chunk id
 
 parse_pkt_fail:
-        fprintf(stderr,
+        memcpy(r->write_buf, hdr, len);
+        r->bytes_waiting = len;
+ fprintf(stderr,
                 "Header not big enough: type %d, but %td bytes received\n",                header_type, (pe - p));
-        return RTMPERR(INVALIDDATA);
+        return RTMPERR(EAGAIN);
 
     }
 
