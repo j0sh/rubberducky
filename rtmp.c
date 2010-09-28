@@ -364,14 +364,15 @@ static int process_packet(ev_io *io)
         p = hdr;
         memcpy(p, r->write_buf, r->bytes_waiting);
         p += r->bytes_waiting;
+        len = 0;
 
         if (!r->chunk_alignment) { // in this case, don't attempt to readahead
         if ((len = read_bytes(r, p, sizeof(hdr) - r->bytes_waiting)) < 0) {
             fprintf(stderr, "ZOMGBROKEN\n");
             return RTMPERR(errno);
         }
-        len += r->bytes_waiting;
         }
+        len += r->bytes_waiting;
         r->bytes_waiting = 0;
 
     }
