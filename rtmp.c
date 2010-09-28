@@ -344,7 +344,7 @@ static int process_packet(ev_io *io)
     rtmp *r = get_rtmp(io);
     srv_ctx *ctx = io->data;
     int len, leftover, header_type, chunk_id, chunk_size, to_increment = 0;
-        rtmp_packet *pkt;
+    rtmp_packet *pkt;
     uint8_t *p, *pe;
     uint8_t hdr[RTMP_MAX_HEADER_SIZE];
 
@@ -375,9 +375,8 @@ static int process_packet(ev_io *io)
         r->bytes_waiting = 0;
 
     }
-
-    p    = hdr;
-    pe   = p + len;
+    p   = hdr;
+    pe  = p + len;
 
     if ((pe - p) < 1)
         goto parse_pkt_fail;
@@ -391,97 +390,97 @@ static int process_packet(ev_io *io)
                 chunk_id, pe - p);
         goto parse_pkt_fail;
     }
-        if (!chunk_id) {
-            chunk_id = *p + 64;
-            p += 1;
-        } else if (1 == chunk_id ) {
-            chunk_id = (*p << 8) + p[1] + 64;
-            p += 2;
-        }
-
-        // get previous packet in chunk
-        if (r->in_channels[chunk_id]) {
-            pkt = r->in_channels[chunk_id];
-        } else {
-            if(!(pkt = malloc(sizeof(rtmp_packet)))) {
-                fprintf(stderr, "Failed to malloc space for packet!\n");
-            return RTMPERR(ENOMEM);
-            }
-            memset(pkt, 0, sizeof(rtmp_packet)); // zero out
-            pkt->chunk_id = chunk_id;
-            r->in_channels[chunk_id] = pkt;
-        }
-        pkt->chunk_type = header_type;
-
-        // NB:  we intentionally fallthrough here
-        switch (header_type) {
-        case CHUNK_LARGE:
-            if ((pe - p) < CHUNK_SIZE_LARGE) goto parse_pkt_fail;
-            pkt->msg_id = AMF_DecodeInt32((const char *)&p[7]);
-            to_increment += 4;
-        case CHUNK_MEDIUM:
-            if ((pe - p) < CHUNK_SIZE_MEDIUM ) goto parse_pkt_fail;
-            pkt->msg_type = p[6];
-            pkt->size = AMF_DecodeInt24((const char*)&p[3]); // size exclusive of header
-            pkt->read = 0;
-            to_increment += 4;
-        case CHUNK_SMALL: {
-            uint32_t ts;
-            if ((pe - p) < CHUNK_SIZE_SMALL) goto parse_pkt_fail; // XXX error out
-            ts = AMF_DecodeInt24((const char*)p);
-            to_increment += 3;
-            if (0xffffff == ts) {
-                // read in extended timestamp
-                static const int header_sizes[] = { CHUNK_SIZE_LARGE,
-                                                    CHUNK_SIZE_MEDIUM,
-                                                    CHUNK_SIZE_SMALL };
-                int hsize = header_sizes[header_type];
-                if (p + hsize + 4 > pe) goto parse_pkt_fail;
-
-                ts = AMF_DecodeInt32((const char*)p+hsize);
-                to_increment += 4;
-            }
-            if (!header_type)
-                pkt->timestamp = ts; // abs timestamp
-            else
-                pkt->timestamp += ts; // timestamp delta
-        }
-        case 3:
-            break;
-        }
-        p += to_increment;
-
-        // copy packet data
-        if (!pkt->read) {
-            // allocate packet body
-            if (pkt->body) {
-                free(pkt->body);
-                pkt->body = NULL;
-            }
-            if (!(pkt->body = malloc(pkt->size))) {
-                fprintf(stderr, "Out of memory when allocating packet!\n");
-            return RTMPERR(ENOMEM);
-            }
-        }
-        chunk_size = r->chunk_size < (pkt->size - pkt->read) ? r->chunk_size : (pkt->size - pkt->read);
-    if (!r->chunk_alignment) {
-    // copy over any data leftover from header buffer
-    leftover = len - (p - hdr);
-    chunk_size -= leftover;
-    if (chunk_size < 0) {
-        // we fucked up and overread into the next packet
-        leftover += chunk_size;
-        r->bytes_waiting = -chunk_size;
-        chunk_size = 0;
+    if (!chunk_id) {
+        chunk_id = *p + 64;
+        p += 1;
+    } else if (1 == chunk_id ) {
+        chunk_id = (*p << 8) + p[1] + 64;
+        p += 2;
     }
+
+    // get previous packet in chunk
+    if (r->in_channels[chunk_id]) {
+        pkt = r->in_channels[chunk_id];
+    } else {
+        if(!(pkt = malloc(sizeof(rtmp_packet)))) {
+            fprintf(stderr, "Failed to malloc space for packet!\n");
+        return RTMPERR(ENOMEM);
+        }
+        memset(pkt, 0, sizeof(rtmp_packet)); // zero out
+        pkt->chunk_id = chunk_id;
+        r->in_channels[chunk_id] = pkt;
+    }
+    pkt->chunk_type = header_type;
+
+    // NB:  we intentionally fallthrough here
+    switch (header_type) {
+    case CHUNK_LARGE:
+        if ((pe - p) < CHUNK_SIZE_LARGE) goto parse_pkt_fail;
+        pkt->msg_id = AMF_DecodeInt32((const char *)&p[7]);
+        to_increment += 4;
+    case CHUNK_MEDIUM:
+        if ((pe - p) < CHUNK_SIZE_MEDIUM ) goto parse_pkt_fail;
+        pkt->msg_type = p[6];
+        pkt->size = AMF_DecodeInt24((const char*)&p[3]); // size exclusive of header
+        pkt->read = 0;
+        to_increment += 4;
+    case CHUNK_SMALL: {
+        uint32_t ts;
+        if ((pe - p) < CHUNK_SIZE_SMALL) goto parse_pkt_fail; // XXX error out
+        ts = AMF_DecodeInt24((const char*)p);
+        to_increment += 3;
+        if (0xffffff == ts) {
+            // read in extended timestamp
+            static const int header_sizes[] = { CHUNK_SIZE_LARGE,
+                                                CHUNK_SIZE_MEDIUM,
+                                                CHUNK_SIZE_SMALL };
+            int hsize = header_sizes[header_type];
+            if (p + hsize + 4 > pe) goto parse_pkt_fail;
+
+            ts = AMF_DecodeInt32((const char*)p+hsize);
+            to_increment += 4;
+        }
+        if (!header_type)
+            pkt->timestamp = ts; // abs timestamp
+        else
+            pkt->timestamp += ts; // timestamp delta
+    }
+    case 3:
+        break;
+    }
+    p += to_increment;
+
+    // copy packet data
+    if (!pkt->read) {
+        // allocate packet body
+        if (pkt->body) {
+            free(pkt->body);
+            pkt->body = NULL;
+        }
+        if (!(pkt->body = malloc(pkt->size))) {
+            fprintf(stderr, "Out of memory when allocating packet!\n");
+            return RTMPERR(ENOMEM);
+        }
+    }
+    chunk_size = r->chunk_size < (pkt->size - pkt->read) ? r->chunk_size : (pkt->size - pkt->read);
+    if (!r->chunk_alignment) {
+        // copy over any data leftover from header buffer
+        leftover = len - (p - hdr);
+        chunk_size -= leftover;
+        if (chunk_size < 0) {
+            // we fucked up and overread into the next packet
+            leftover += chunk_size;
+            r->bytes_waiting = -chunk_size;
+            chunk_size = 0;
+        }
     //printf("id %d diff %d, chunksize %d, read %d, remaining %d, sum %d, size %d next pkt bytes %d\n", pkt->chunk_id, leftover, chunk_size, pkt->read, pkt->size -  pkt->read, pkt->read + chunk_size + leftover, pkt->size, r->bytes_waiting);
     // candidate for synthetic microbenchmarking against a while loop
-    memcpy(pkt->body + pkt->read, p, leftover);
-    p         += leftover;
-    pkt->read += leftover;
+        memcpy(pkt->body + pkt->read, p, leftover);
+        p         += leftover;
+        pkt->read += leftover;
     } else {
         chunk_size = r->chunk_alignment;
-	r->chunk_alignment = 0;
+	    r->chunk_alignment = 0;
     }
 
     if (chunk_size) {
@@ -489,24 +488,24 @@ static int process_packet(ev_io *io)
 	        if (errno == EAGAIN) // should do this for all other recvs too
 	            len = 0;
 	        else {
-        fprintf(stderr, "Error reading bytes!\n");
-        return RTMPERR(errno);
+                fprintf(stderr, "Error reading bytes!\n");
+                return RTMPERR(errno);
 	        }
-	}
-	// chunks should be forbidden on packet boundaries. bah.
-    if (len != chunk_size) {
-        r->chunk_alignment = chunk_size - len; 
-        pkt->read += len;
-        // a hideous hack:
-        // fake a chunk type of 3 and copy the chunk header
-        p = r->write_buf;
-        *p++ = (3 << 6) | (hdr[0] & 0x3f);
-        *p++ = hdr[1];
-        *p++ = hdr[2];
-        r->bytes_waiting = 3;
-        fprintf(stderr, "hideousness suppressed: %d left\n", chunk_size - len);
-        return RTMPERR(EAGAIN);
-	}
+	    }
+	    // chunks should be forbidden on packet boundaries. bah.
+        if (len != chunk_size) {
+            r->chunk_alignment = chunk_size - len;
+            pkt->read += len;
+            // a hideous hack:
+            // fake a chunk type of 3 and copy the chunk header
+            p = r->write_buf;
+            *p++ = (3 << 6) | (hdr[0] & 0x3f);
+            *p++ = hdr[1];
+            *p++ = hdr[2];
+            r->bytes_waiting = 3;
+            fprintf(stderr, "hideousness suppressed: %d left\n", chunk_size - len);
+            return RTMPERR(EAGAIN);
+	    }
     } else if (r->bytes_waiting) {
         // we copied way too much in the header and spilled over
         // into the next packet; save the leftover leftover bytes
@@ -514,7 +513,7 @@ static int process_packet(ev_io *io)
         // XXX probably should verify size of write_buf!
         memcpy(r->write_buf, p, r->bytes_waiting);
     }
-        pkt->read += chunk_size;
+    pkt->read += chunk_size;
 
    /*
         fprintf(stdout, "Packet/Chunk parameters:\n"
@@ -537,13 +536,12 @@ static int process_packet(ev_io *io)
     return chunk_size + leftover + to_increment; // missing chunk id
 
 parse_pkt_fail:
-        memcpy(r->write_buf, hdr, len);
-        r->bytes_waiting = len;
- fprintf(stderr,
-                "Header not big enough: type %d, but %td bytes received\n",                header_type, (pe - p));
-        return RTMPERR(EAGAIN);
-
-    }
+    memcpy(r->write_buf, hdr, len);
+    r->bytes_waiting = len;
+    fprintf(stderr,
+            "Header not big enough: type %d, but %td bytes received\n",                header_type, (pe - p));
+    return RTMPERR(EAGAIN);
+}
 
 void rtmp_read(struct ev_loop *loop, ev_io *io, int revents)
 {
@@ -551,21 +549,21 @@ void rtmp_read(struct ev_loop *loop, ev_io *io, int revents)
     srv_ctx *ctx = io->data;
     int bytes_read;
 
-        switch (r->state) {
-        case UNINIT:
-            bytes_read = init_handshake(io);
-            if (RTMPERR(EAGAIN) != bytes_read) r->state = HANDSHAKE;
-            break;
-        case HANDSHAKE:
-            bytes_read = handshake2(io);
-            if (RTMPERR(EAGAIN) != bytes_read) r->state = READ;
-            break;
-        case READ:
-            bytes_read = process_packet(io);
-            break;
-        }
-        if (bytes_read <= 0 && bytes_read != RTMPERR(EAGAIN)) goto read_error;
-        r->rx += bytes_read;
+    switch (r->state) {
+    case UNINIT:
+        bytes_read = init_handshake(io);
+        if (RTMPERR(EAGAIN) != bytes_read) r->state = HANDSHAKE;
+        break;
+    case HANDSHAKE:
+        bytes_read = handshake2(io);
+        if (RTMPERR(EAGAIN) != bytes_read) r->state = READ;
+        break;
+    case READ:
+        bytes_read = process_packet(io);
+        break;
+    }
+    if (bytes_read <= 0 && bytes_read != RTMPERR(EAGAIN)) goto read_error;
+    r->rx += bytes_read;
 
     return;
 
