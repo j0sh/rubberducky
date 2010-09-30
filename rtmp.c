@@ -312,7 +312,8 @@ static int handshake2(ev_io *io)
     uint8_t *p = pkt->body, *pe;
 
     if (!pkt || !pkt->body || pkt->size < RTMP_SIG_SIZE) {
-        fprintf(stderr, "Something weird is going on: packet nonexistent "                         "in second part of handshake\n");
+        fprintf(stderr, "Something weird is going on: packet nonexistent "
+                         "in second part of handshake\n");
         return RTMPERR(INVALIDDATA);
     }
 
@@ -341,7 +342,6 @@ static int handshake2(ev_io *io)
                 fprintf(stderr, "Client not genuine Adobe\n");
                 return RTMPERR(INVALIDDATA);
             }
-            fprintf(stderr, "we tried to do a signed handshake\n");
         }
         // we should verify the bytes returned match in pre-fp9 handshakes
         // but: Postel's Law.
@@ -484,7 +484,6 @@ static int process_packet(ev_io *io)
 	    r->chunk_alignment = 0;
     }
 
-
     if (chunk_size) {
         int len;
         if ((len = read_bytes(r, pkt->body + pkt->read, chunk_size)) <= 0) {
@@ -539,12 +538,9 @@ static int process_packet(ev_io *io)
         r->read_cb(r, pkt, ctx);
         pkt->read = 0;
     }
-    return chunk_size + to_increment; // missing chunk id and leftover copy
+    return chunk_size + to_increment; // broken; increment rx after recv
 
 parse_pkt_fail:
-    fprintf(stdout,
-            "Header not big enough: type %d, but %td bytes received\n",
-             header_type, (pe - p));
     return RTMPERR(EAGAIN);
 }
 
