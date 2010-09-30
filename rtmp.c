@@ -376,7 +376,6 @@ static int process_packet(ev_io *io)
             fprintf(stdout, "ZOMGBROKEN\n");
             return RTMPERR(errno);
         }
-    }
     pe  = p + r->hdr_bytes;
 
     if ((pe - p) < 1)
@@ -465,7 +464,6 @@ static int process_packet(ev_io *io)
     chunk_size = r->chunk_size < (pkt->size - pkt->read) ?
                  r->chunk_size : (pkt->size - pkt->read);
 
-    if (!r->chunk_alignment) {
         // copy over any data leftover from header buffer
         int leftover = r->hdr_bytes - (p - r->hdr);
         chunk_size -= leftover;
