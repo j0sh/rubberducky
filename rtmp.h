@@ -57,10 +57,11 @@ typedef struct rtmp {
     uint32_t tx;
     rtmp_state state;
 
-    // write buffer
-    uint8_t write_buf[1600];
-    int bytes_waiting;
+    // chunk header buffer
+    uint8_t hdr[RTMP_MAX_HEADER_SIZE];
+    int hdr_bytes;
 
+    rtmp_packet *prev_pkt; // used when chunks are split across tcp packets
     int chunk_alignment;
 
     rtmp_packet *in_channels[RTMP_CHANNELS]; // find a better way
