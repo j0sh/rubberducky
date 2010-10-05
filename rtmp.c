@@ -178,7 +178,15 @@ static inline rtmp* get_rtmp(ev_io *w)
 
 static int read_bytes(rtmp *r, uint8_t *p, int howmany)
 {
-    return recv(r->fd, p, howmany, 0);
+    int len;
+    len = recv(r->fd, p, howmany, 0);
+    if (!len) {
+        // If no messages are available to be received and the peer
+        // has performed an orderly shutdown, recv() shall return 0.
+        errno = EIO;
+    }
+    // TODO send return report if rx exceeds ack size
+    return len ;
 }
 
 static int init_handshake(ev_io *io)
@@ -372,7 +380,7 @@ static int process_packet(ev_io *io)
         // overread the header a little to avoid having to call recv
         // for each byte as we need it.
         // later, copy leftover/unused data in the header buffer to body
-        if ((r->hdr_bytes += read_bytes(r, p + r->hdr_bytes, sizeof(r->hdr) - r->hdr_bytes)) < 0) {
+        if ((r->hdr_bytes += read_bytes(r, p + r->hdr_bytes, sizeof(r->hdr) - r->hdr_bytes)) <= 0) {
             fprintf(stdout, "ZOMGBROKEN\n");
             return RTMPERR(errno);
         }
@@ -563,7 +571,7 @@ void rtmp_read(struct ev_loop *loop, ev_io *io, int revents)
         bytes_read = process_packet(io);
         break;
     }
-    if (bytes_read < 0 && bytes_read != RTMPERR(EAGAIN)) goto read_error;
+    if (bytes_read <= 0 && bytes_read != RTMPERR(EAGAIN)) goto read_error;
     r->rx += bytes_read;
 
     return;
