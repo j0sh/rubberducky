@@ -185,6 +185,8 @@ static int read_bytes(rtmp *r, uint8_t *p, int howmany)
         // has performed an orderly shutdown, recv() shall return 0.
         errno = EIO;
     }
+    if (len > 0)
+        r->rx += len;
     // TODO send return report if rx exceeds ack size
     return len ;
 }
@@ -309,7 +311,7 @@ static int init_handshake(ev_io *io)
         send(r->fd, p, RTMP_SIG_SIZE, 0);
         r->tx += RTMP_SIG_SIZE;
         pkt->read = 0; // this bookkeping sucks. fix.
-        return read_size;
+        return 1;
     }
 
 static int handshake2(ev_io *io)
@@ -363,7 +365,7 @@ static int handshake2(ev_io *io)
         out->body = NULL;
         r->out_channels[out->chunk_id] = NULL;
         free(out);
-        return RTMP_SIG_SIZE;
+        return 1;
     }
 
 static int process_packet(ev_io *io)
@@ -546,7 +548,7 @@ static int process_packet(ev_io *io)
         r->read_cb(r, pkt, ctx);
         pkt->read = 0;
     }
-    return chunk_size + to_increment; // broken; increment rx after recv
+    return 1;
 
 parse_pkt_fail:
     return RTMPERR(EAGAIN);
@@ -572,7 +574,6 @@ void rtmp_read(struct ev_loop *loop, ev_io *io, int revents)
         break;
     }
     if (bytes_read <= 0 && bytes_read != RTMPERR(EAGAIN)) goto read_error;
-    r->rx += bytes_read;
 
     return;
 
