@@ -1,10 +1,10 @@
 The videoapi mediaserver. We need a better name for it.
 
-Requires libev and librtmp.
+Requires libev, librtmp, and openssl.
 
 The makefile will probably have to be modified locally to suit your needs.
 
-$ ./make
+$ make
 $ ./a.out
 
 Connect with your rtmp client of choice. It establishes the cxn but does

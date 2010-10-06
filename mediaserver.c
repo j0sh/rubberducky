@@ -6,17 +6,20 @@
 
 #include <sys/types.h>
 #include <sys/socket.h>
+#include <arpa/inet.h>
+#include <unistd.h>
 #include <netdb.h>
 #include <fcntl.h>
 
 /* lib includes */
-#include <librtmp/rtmp.h>
 #include <librtmp/log.h>
+#include <librtmp/amf.h>
 #include <ev.h>
 
 /* local includes */
 #include "mediaserver.h"
-#include "librtmp.h"
+#include "rtmp.h"
+#include "process_messages.h"
 
 #define BACKLOG           20
 
@@ -100,19 +103,8 @@ static void free_client(srv_ctx *ctx, client_ctx *client)
     else
         p->next = c->next;
 
-    ev_io_stop(ctx->loop, &c->read_watcher);
-    ev_io_stop(ctx->loop, &c->write_watcher);
-
-    /* close()ing this socket, although seemingly
-     * the Right Thing, could break a lot of things!
-     * apparently when a cxn closes while another is
-     * pending, Linux will silently reuse the old
-     * FD for the new cxn... */
-    //close(c->fd);
     fprintf(stdout, "(%d) Disconnecting\n", c->id);
-    if (c->rtmp.Link.hostname.av_len)
-        free(c->rtmp.Link.hostname.av_val);
-    RTMP_Close(&c->rtmp);
+    rtmp_free(&c->rtmp);
     free(c);
     ctx->connections--;
 }
@@ -125,12 +117,7 @@ static void free_all(srv_ctx *ctx)
     while (c) {
         client_ctx *d = c;
         c = c->next;
-        close(d->fd);
-        if(d->rtmp.Link.hostname.av_len)
-            free(d->rtmp.Link.hostname.av_val); // XXX fix this
-        RTMP_Close(&d->rtmp);
-        ev_io_stop(ctx->loop, &d->read_watcher);
-        ev_io_stop(ctx->loop, &d->write_watcher);
+        rtmp_free(&d->rtmp);
         free(d);
     }
     ctx->clients = NULL;
@@ -148,59 +135,25 @@ static void close_cb(struct ev_loop *loop, ev_signal *signal, int revents)
     free_all((srv_ctx*)signal->data);
 }
 
-static inline client_ctx* get_client_from_reader(ev_io *w)
+static void rtmp_read_cb(rtmp *r, struct rtmp_packet *pkt, void *opaque)
 {
-    return (client_ctx*)((char *)w - offsetof(client_ctx, read_watcher));
-}
-
-static void client_read_cb(struct ev_loop *loop, ev_io *io, int revents)
-{
-    srv_ctx *ctx = io->data;
-    client_ctx *client = get_client_from_reader(io);
-    RTMP *rtmp = &client->rtmp;
-    RTMPPacket *pkt = &client->packet;
-    //fprintf(stdout, "id %d, read %d (%d %x)... ",
-      //      client->id, client->reads++,
-      //`      client->fd, (unsigned)&client->read_watcher);
-    //fflush(stdout);
-
-    if (RTMP_IsConnected(rtmp)) {
-        if (RTMP_ReadPacket(rtmp, pkt) &&
-            RTMPPacket_IsReady(pkt)) {
-                switch (pkt->m_packetType) {
-                case 0x03: /* bytes read */
-                    // do we realy need to do anything?
-                    //AMF_DecodeInt32(pkt->m_body);
-                    break;
-                case 0x08:
-                case 0x09: {
-                    int i = 0;
-                    for (i = 0; i < ctx->stream.cxn_count; i++)
-                    {
-                        RTMP_SendPacket(ctx->stream.fds[i], pkt, FALSE);
-                    }
-                    break;
-                }
-                case 0x14: /* invoke */
-                    rtmp_invoke(rtmp, pkt, ctx);
-                    break;
-                }
-                RTMPPacket_Free(pkt);
-                RTMPPacket_Reset(pkt);
-        }
-        if (!RTMP_IsConnected(rtmp)) {
-            free_client(ctx, client);
-        }
-    } else { /* disconnected. TODO tie this in to events or smth */
-        free_client(ctx, client);
+    srv_ctx *ctx = (srv_ctx*)opaque;
+    switch(pkt->msg_type) {
+    case 0x03:
+        fprintf(stdout, "Ack: %d Bytes Read\n", AMF_DecodeInt32(pkt->body));
+        break;
+    case 0x05:
+        fprintf(stdout, "Set Ack Size: %d\n", AMF_DecodeInt32(pkt->body));
+        break;
+    case 0x08:
+    case 0x09:
+        break; // audio and video
+    case 0x14:
+        rtmp_invoke(r, pkt, ctx);
+        break;
+    default:
+        fprintf(stdout, "default in cb: %d\n", pkt->msg_type);
     }
-
-    //fprintf(stdout, "exiting\n");
-}
-
-static void client_write_cb(struct ev_loop *loop, ev_io *io, int revents)
-{
-    fprintf(stdout, "writing.\n");
 }
 
 static void incoming_cb(struct ev_loop *loop, ev_io *io, int revents)
@@ -226,28 +179,19 @@ static void incoming_cb(struct ev_loop *loop, ev_io *io, int revents)
     client->next = ctx->clients;
     ctx->clients = client;
     ctx->connections++;
-    RTMP_Init(&client->rtmp);
-    memset(&client->packet, 0, sizeof(RTMPPacket));
-    client->rtmp.m_sb.sb_socket = clientfd;
-    client->rtmp.Link.timeout = 5; // i reckon this is useless
-    client->rtmp.Link.hostname.av_len = 0;
-    client->fd = clientfd;
     client->id = ctx->total_cxns++;
     client->reads = 0;
 
-    if (!RTMP_Serve(&client->rtmp)) {
-        errstr = "RTMP handshake failed";
-        goto fail;
-    }
-    //fcntl(clientfd, F_SETFL, O_NONBLOCK); // doesnt work well with librtmp
+    rtmp_init(&client->rtmp);
+    client->rtmp.fd = clientfd;
+    client->rtmp.read_watcher.data = ctx;
+    client->rtmp.read_cb = rtmp_read_cb;
 
-    /* setup the rest of the events */
-    client->read_watcher.data = ctx;
-    ev_io_init(&client->read_watcher, client_read_cb, client->fd, EV_WRITE);
-    ev_io_start(ctx->loop, &client->read_watcher);
+    fcntl(clientfd, F_SETFL, O_NONBLOCK);
 
-    client->write_watcher.data = client;
-    ev_io_init(&client->write_watcher, client_write_cb, client->fd, EV_READ);
+    /* setup the events */
+    ev_io_init(&client->rtmp.read_watcher, rtmp_read, client->rtmp.fd, EV_READ);
+    ev_io_start(ctx->loop, &client->rtmp.read_watcher);
 
     // we can convert this to a readable hostname later
     // during some postprocessing/analytics stage.
@@ -312,12 +256,6 @@ int main(int argc, char** argv)
     ctx->stream.cxn_count = 0;
     setup_events(ctx);
     ev_loop(ctx->loop, EVBACKEND_EPOLL);
-
-    // shut up librtmp error messages.
-    // none of these seem to work...
-    RTMP_LogSetOutput(0); // /dev/null
-    RTMP_LogSetLevel(RTMP_LOGCRIT);
-    RTMP_debuglevel = RTMP_LOGCRIT;
 
     return 0;
 

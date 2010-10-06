@@ -1,17 +1,22 @@
 #ifndef VIDEOAPI_MEDIASERVER_H
 #define VIDEOAPI_MEDIASERVER_H
 
-#include <librtmp/rtmp.h>
 #include <ev.h>
 
+#include "rtmp.h"
+
+#ifndef videoapi_unused
+#if defined(__GNUC__)
+#   define videoapi_unused __attribute__((unused))
+#else
+#   define videoapi_unused
+#endif
+#endif
+
 typedef struct client_ctx {
-    int fd;
     int id;
     int reads;
-    ev_io write_watcher;
-    ev_io read_watcher;
-    RTMP rtmp;
-    RTMPPacket packet;
+    rtmp rtmp;
     struct client_ctx *next;
 }client_ctx;
 
@@ -19,7 +24,7 @@ typedef struct stream_ctx {
     int fd;
     int cxn_count;
     char name[128];
-    RTMP *fds[1024];
+    rtmp *fds[1024];
     //ev_io read_watcher;
 } stream_ctx;
 
