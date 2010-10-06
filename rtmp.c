@@ -204,7 +204,7 @@ static int init_handshake(ev_io *io)
         out = malloc(sizeof(rtmp_packet));
         if (!out) return RTMPERR(ENOMEM);
         memset(out, 0, sizeof(rtmp_packet));
-        out->size = read_size;
+        out->alloc_size = out->size = read_size;
         out->body = malloc(read_size);
         if (!out->body) return RTMPERR(ENOMEM);
         r->out_channels[0] = out;
@@ -217,7 +217,7 @@ static int init_handshake(ev_io *io)
         pkt = malloc(sizeof(rtmp_packet));
         if (!pkt) return RTMPERR(ENOMEM);
         memset(pkt, 0, sizeof(rtmp_packet));
-        pkt->size = read_size;
+        pkt->alloc_size = pkt->size = read_size;
         pkt->body = malloc(read_size);
         if (!pkt->body) return RTMPERR(ENOMEM);
         r->in_channels[0] = pkt;
@@ -458,19 +458,22 @@ static int process_packet(ev_io *io)
     }
     p += to_increment;
 
-    // copy packet data
-    if (!pkt->read) {
+    // enlarge packet body if needed
+    if (!pkt->read && pkt->alloc_size < pkt->size) {
         // allocate packet body
         if (pkt->body) {
             free(pkt->body);
             pkt->body = NULL;
+            pkt->alloc_size = 0;
         }
         if (!(pkt->body = malloc(pkt->size))) {
             fprintf(stderr, "Out of memory when allocating packet!\n");
             return RTMPERR(ENOMEM);
         }
+        pkt->alloc_size = pkt->size;
     }
 
+    // copy packet data
     chunk_size = r->chunk_size < (pkt->size - pkt->read) ?
                  r->chunk_size : (pkt->size - pkt->read);
 

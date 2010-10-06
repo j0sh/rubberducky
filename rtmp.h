@@ -47,6 +47,7 @@ typedef struct rtmp_packet {
     uint32_t timestamp;
     chunk_types chunk_type;
     uint8_t *body;
+    int alloc_size; // amount allocated for body (size <= alloc_size)
  }rtmp_packet;
 
 typedef struct rtmp {
