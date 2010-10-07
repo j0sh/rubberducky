@@ -335,41 +335,7 @@ static void handle_connect(rtmp *rtmp, rtmp_packet *pkt, AMFObject *obj)
                 pval.av_val = NULL;
             } else if(AVMATCH(&pname, &av_tcUrl))
             {
-                char *r1 = NULL, *r2;
-                int len;
-                //rtmp->Link.tcUrl = pval;
-                if ('r' == (pval.av_val[0] | 0x40) &&
-                    't' == (pval.av_val[1] | 0x40) &&
-                    'm' == (pval.av_val[2] | 0x40) &&
-                    'p' == (pval.av_val[3] | 0x40))
-                {
-                    if(':' == pval.av_val[4])
-                    {
-                        //rtmp->Link.protocol = RTMP_PROTOCOL_RTMP;
-                        r1 = pval.av_val+7;
-                    } else if('e' == (pval.av_val[4] | 0x40) &&
-                              ':' == pval.av_val[5])
-                    {
-                        //rtmp->Link.protocol = RTMP_PROTOCOL_RTMPE;
-                        r1 = pval.av_val+8;
-                    }
-                    r2 = strchr(r1, '/');
-                    len = r2 ? r2 - r1 : pval.av_len - (r1 - pval.av_val);
-                    r2 = malloc(len+1); //XXX fix this; LEAKS
-                    memcpy(r2, r1, len);
-                    r2[len] = '\0';
-                    //rtmp->Link.hostname.av_val = r2;
-                    r1 = strrchr(r2, ':');
-                    if(r1)
-                    {
-                        //rtmp->Link.hostname.av_len = r1 - r2;
-                        *r1++ = '\0';
-                        //rtmp->Link.port = atoi(r1);
-                    } else {
-                        //rtmp->Link.hostname.av_len = len;
-                        //rtmp->Link.port = RTMP_PORT;
-                    }
-                }
+                fprintf(stderr, "tcUrl: %s\n", pval.av_val);
                 pval.av_val = NULL;
             } else if(AVMATCH(&pname, &av_pageUrl))
             {
