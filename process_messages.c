@@ -320,7 +320,14 @@ static void handle_connect(rtmp *rtmp, rtmp_packet *pkt, AMFObject *obj)
             }
             if(AVMATCH(&pname, &av_app))
             {
-                //rtmp->Link.app = pval;
+                char *app = malloc(pval.av_len + 1);
+                if (!app) { // do something drastic!
+                    fprintf(stderr, "Out of memory!\n");
+                }
+                strncpy(app, pval.av_val, pval.av_len);
+                app[pval.av_len] = '\0'; // pval may not be nulled
+                rtmp->app = app;
+                fprintf(stdout, "app: %s\n", rtmp->app);
                 pval.av_val = NULL;
             } else if(AVMATCH(&pname, &av_flashVer))
             {

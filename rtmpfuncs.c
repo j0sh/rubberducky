@@ -45,6 +45,7 @@ void rtmp_free(rtmp *r)
         free_packet(&r->out_channels[i]);
     }
     close(r->fd);
+    if (r->app) free(r->app);
 }
 
 int rtmp_send(rtmp *r, rtmp_packet *pkt) {
