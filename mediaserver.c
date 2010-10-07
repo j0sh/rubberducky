@@ -253,7 +253,6 @@ int main(int argc, char** argv)
     ctx->connections = 0;
     ctx->total_cxns = 0;
     ctx->clients = NULL;
-    ctx->stream.cxn_count = 0;
     setup_events(ctx);
     ev_loop(ctx->loop, EVBACKEND_EPOLL);
 
