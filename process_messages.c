@@ -241,7 +241,7 @@ static int send_fcpublish(rtmp *rtmp, AVal *streamname,
     return rtmp_send(rtmp, &packet);
 }
 
-static int send_onstatus(rtmp *rtmp, AVal *streamname, stream_cmd action)
+static int send_onstatus(rtmp *rtmp, char *streamname, stream_cmd action)
 {
     uint8_t pbuf[256], *end = pbuf+sizeof(pbuf), *enc = pbuf+RTMP_MAX_HEADER_SIZE, *foo;
     uint8_t tbuf[64], pubstr[64]; //XXX this might not be enough later on
@@ -256,18 +256,18 @@ static int send_onstatus(rtmp *rtmp, AVal *streamname, stream_cmd action)
     switch(action) {
     case publish:
         strncpy(pubstr, "NetStream.Publish.Start", sizeof(pubstr));
-        snprintf(tbuf, sizeof(tbuf), "%s is now published.", streamname->av_val);
+        snprintf(tbuf, sizeof(tbuf), "%s is now published.", streamname);
         break;
     case unpublish:
         strncpy(pubstr, "NetStream.Unpublish.Success", sizeof(pubstr));
-        snprintf(tbuf, sizeof(tbuf), "%s is now unpublished.", streamname->av_val);
+        snprintf(tbuf, sizeof(tbuf), "%s is now unpublished.", streamname);
         break;
     case play:
         //XXX this state really should be 'play pending' or something
         //TODO send PlayPublishNotify when actually ready to play
         //TODO send Play.Reset chunk before Play.Start
         strncpy(pubstr, "NetStream.Play.Start", sizeof(pubstr));
-        snprintf(tbuf, sizeof(tbuf), "%s is now published.", streamname->av_val);
+        snprintf(tbuf, sizeof(tbuf), "%s is now published.", streamname);
         break;
     default:
         strncpy(pubstr, "oops", sizeof(pubstr));
@@ -469,8 +469,7 @@ void rtmp_invoke(rtmp *rtmp, rtmp_packet *pkt, srv_ctx *ctx)
                 break;
             }
         }
-        send_onstatus(rtmp, &val, publish);
-        strncpy(ctx->stream.name, val.av_val, sizeof(ctx->stream.name));
+        send_onstatus(rtmp, val.av_val, publish);
         fprintf(stdout, "publishing %s (id %d)\n",
                 rtmp->streams[i]->name, rtmp->streams[i]->id);
     } else if(AVMATCH(&method, &av_deleteStream))
@@ -483,7 +482,7 @@ void rtmp_invoke(rtmp *rtmp, rtmp_packet *pkt, srv_ctx *ctx)
                     fprintf(stderr, "deleting %s (%d)\n",
                             rtmp->streams[i]->name, stream_id);
                     // TODO only for published streams
-                    send_onstatus(rtmp, &val, unpublish);
+                    send_onstatus(rtmp, rtmp->streams[i]->name, unpublish);
                     rtmp_free_stream(&rtmp->streams[i]);
                 }
             }
@@ -491,7 +490,7 @@ void rtmp_invoke(rtmp *rtmp, rtmp_packet *pkt, srv_ctx *ctx)
     } else if(AVMATCH(&method, &av_play))
     {
         AMFProp_GetString(AMF_GetProp(&obj, NULL, 3), &val);
-        send_onstatus(rtmp, &val, play);
+        send_onstatus(rtmp, val.av_val, play);
         //ctx->stream.fds[ctx->stream.cxn_count++] = rtmp;
     }
     AMF_Reset(&obj);
