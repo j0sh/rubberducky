@@ -16,6 +16,15 @@ void rtmp_init(rtmp *r)
     r->chunk_size = RTMP_DEFAULT_CHUNKSIZE;
 }
 
+void rtmp_free_stream(rtmp_stream **stream)
+{
+    rtmp_stream *s = *stream;
+    if (s->name) free(s->name);
+    s->name = NULL;
+    free(s);
+    s = NULL;
+}
+
 static void free_packet(rtmp_packet **packet) {
     rtmp_packet *pkt = *packet;
     if (pkt) {
@@ -34,6 +43,10 @@ void rtmp_free(rtmp *r)
     for (i = 0; i < RTMP_CHANNELS; i++) {
         free_packet(&r->in_channels[i]);
         free_packet(&r->out_channels[i]);
+    }
+    for (i = 0; i < RTMP_MAX_STREAMS; i++) {
+        if (r->streams[i])
+            rtmp_free_stream(&r->streams[i]);
     }
     close(r->fd);
     if (r->app) free(r->app);

@@ -20,6 +20,9 @@
 #define RTMP_CHANNELS 65600
 #define RTMP_DEFAULT_CHUNKSIZE 128
 
+// arbitrary constants, not protocol specific
+#define RTMP_MAX_STREAMS 16
+
 // size in bytes
 typedef enum chunk_sizes { CHUNK_SIZE_LARGE  = 11,
                    CHUNK_SIZE_MEDIUM =  7,
@@ -40,7 +43,7 @@ typedef enum rtmp_state { UNINIT = 0,
 
 typedef struct rtmp_packet {
     int chunk_id;
-    int msg_id; // useless?
+    int msg_id; // stream id?
     int msg_type;
     int size;
     int read;
@@ -49,6 +52,11 @@ typedef struct rtmp_packet {
     uint8_t *body;
     int alloc_size; // amount allocated for body (size <= alloc_size)
  }rtmp_packet;
+
+typedef struct rtmp_stream {
+    int id;
+    char *name;
+}rtmp_stream;
 
 typedef struct rtmp {
     int fd;
@@ -67,6 +75,7 @@ typedef struct rtmp {
 
     rtmp_packet *in_channels[RTMP_CHANNELS]; // find a better way
     rtmp_packet *out_channels[RTMP_CHANNELS];
+    rtmp_stream *streams[RTMP_MAX_STREAMS];
     char *app; // application name string
     ev_io read_watcher;
     void (*read_cb)(struct rtmp *r, rtmp_packet *pkt, void *opaque);
@@ -74,6 +83,7 @@ typedef struct rtmp {
 
 void rtmp_init(rtmp *r);
 void rtmp_free(rtmp *r);
+void rtmp_free_stream(rtmp_stream **stream);
 void rtmp_read(struct ev_loop *loop, ev_io *io, int revents);
 int  rtmp_send(rtmp *r, struct rtmp_packet *pkt);
 void CalculateDigest(unsigned int digestPos, uint8_t *handshakeMessage,
