@@ -72,7 +72,6 @@ typedef struct rtmp {
     void (*read_cb)(struct rtmp *r, rtmp_packet *pkt, void *opaque);
 }rtmp;
 
-void rtmp_parser_init(rtmp *r);
 void rtmp_init(rtmp *r);
 void rtmp_free(rtmp *r);
 void rtmp_read(struct ev_loop *loop, ev_io *io, int revents);
