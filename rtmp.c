@@ -522,7 +522,7 @@ static int process_packet(ev_io *io)
         // into a temp buffer
         // XXX probably should verify size of write_buf!
         assert(r->hdr_bytes <= sizeof(r->hdr));
-        memcpy(r->hdr, p, r->hdr_bytes);
+        memmove(r->hdr, p, r->hdr_bytes);
     } else {
         // this condition is triggered when we have:
         // a) chunk body (or remainder thereof) that fits into header buf
