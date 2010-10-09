@@ -41,6 +41,10 @@ typedef enum rtmp_state { UNINIT = 0,
                           READ
 }rtmp_state;
 
+typedef enum amf_encoding { AMF0 = 0,
+                            AMF3 = 3
+}amf_encoding;
+
 typedef struct rtmp_packet {
     int chunk_id;
     int msg_id; // stream id?
@@ -64,6 +68,7 @@ typedef struct rtmp {
     int chunk_size; // max 65546 bytes
     uint32_t rx;
     uint32_t tx;
+    amf_encoding encoding;
     rtmp_state state;
 
     // chunk header buffer

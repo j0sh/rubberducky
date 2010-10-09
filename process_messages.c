@@ -174,7 +174,7 @@ static int send_cxn_resp(rtmp *rtmp, double txn)
   enc = AMF_EncodeNamedString(enc, pend, &av_code, &av);
   STR2AVAL(av, "Connection succeeded.");
   enc = AMF_EncodeNamedString(enc, pend, &av_description, &av);
-  //enc = AMF_EncodeNamedNumber(enc, pend, &av_objectEncoding, rtmp->m_fEncoding);
+  enc = AMF_EncodeNamedNumber(enc, pend, &av_objectEncoding, rtmp->encoding);
   STR2AVAL(p.p_name, "version");
   STR2AVAL(p.p_vu.p_aval, "3,5,1,525");
   p.p_type = AMF_STRING;
@@ -349,8 +349,20 @@ static void handle_connect(rtmp *rtmp, rtmp_packet *pkt, AMFObject *obj)
                 //rtmp->m_fVideoCodecs = cobj.o_props[i].p_vu.p_number;
             } else if(AVMATCH(&pname, &av_objectEncoding))
             {
-                //rtmp->m_fEncoding = cobj.o_props[i].p_vu.p_number;
-                ////rtmp->m_bSendEncoding = TRUE;
+                switch((int)cobj.o_props[i].p_vu.p_number) {
+                case AMF0:
+                    rtmp->encoding = AMF0;
+                    break;
+                case AMF3:
+                    rtmp->encoding = AMF3;
+                    break;
+                default:
+                    fprintf(stderr, "Unknown AMF encoding %d\n",
+                            (int)cobj.o_props[i].p_vu.p_number);
+                    return; // XXX do something drastic; close cxn?
+                }
+                fprintf(stderr, "object encoding: AMF%d\n",
+                        rtmp->encoding);
             }
             // unrecognized string
             if(pval.av_val)
