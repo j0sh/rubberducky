@@ -82,6 +82,7 @@ typedef struct rtmp {
     rtmp_packet *out_channels[RTMP_CHANNELS];
     rtmp_stream *streams[RTMP_MAX_STREAMS];
     char *app; // application name string
+    char *url; // protocol, hostname and application name
     ev_io read_watcher;
     void (*read_cb)(struct rtmp *r, rtmp_packet *pkt, void *opaque);
 }rtmp;

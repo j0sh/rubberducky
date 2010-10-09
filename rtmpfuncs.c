@@ -50,6 +50,7 @@ void rtmp_free(rtmp *r)
     }
     close(r->fd);
     if (r->app) free(r->app);
+    if (r->url) free(r->url);
 }
 
 int rtmp_send(rtmp *r, rtmp_packet *pkt) {

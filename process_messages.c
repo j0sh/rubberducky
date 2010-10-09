@@ -335,7 +335,14 @@ static void handle_connect(rtmp *rtmp, rtmp_packet *pkt, AMFObject *obj)
                 pval.av_val = NULL;
             } else if(AVMATCH(&pname, &av_tcUrl))
             {
-                fprintf(stderr, "tcUrl: %s\n", pval.av_val);
+                fprintf(stdout, "tcUrl: %s\n", pval.av_val);
+                rtmp->url = malloc(pval.av_len + 1);
+                if (!rtmp->url) { // TODO something drastic
+                    fprintf(stderr, "Out of memory when allocating tc_url!\n");
+                    return;
+                }
+                strncpy(rtmp->url, pval.av_val, pval.av_len);
+                rtmp->url[pval.av_len] = '\0';
                 pval.av_val = NULL;
             } else if(AVMATCH(&pname, &av_pageUrl))
             {
