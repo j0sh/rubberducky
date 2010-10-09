@@ -180,7 +180,6 @@ static void incoming_cb(struct ev_loop *loop, ev_io *io, int revents)
     ctx->clients = client;
     ctx->connections++;
     client->id = ctx->total_cxns++;
-    client->reads = 0;
 
     rtmp_init(&client->rtmp);
     client->rtmp.fd = clientfd;

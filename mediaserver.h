@@ -15,7 +15,6 @@
 
 typedef struct client_ctx {
     int id;
-    int reads;
     rtmp rtmp;
     struct client_ctx *next;
 }client_ctx;
