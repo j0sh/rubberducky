@@ -195,6 +195,28 @@ static int send_ack(rtmp *r, int ts)
     return rtmp_send(r, &packet);
 }
 
+static int send_pong(rtmp *r, uint32_t ping_t, int ts)
+{
+    uint8_t pbuf[RTMP_MAX_HEADER_SIZE + 6],
+    *body = pbuf + RTMP_MAX_HEADER_SIZE, *end = pbuf + sizeof(pbuf);
+    rtmp_packet packet = {
+        .chunk_id  = 0x02,
+        .msg_id    = 0,
+        .msg_type  = 0x04,
+        .timestamp = ts,
+        .size      = end - body,
+        .body      = body
+    };
+
+    amf_write_i16(body, end, 0x07);
+    body += 2;
+    amf_write_i32(body, end, ping_t);
+    memset(pbuf, 0, RTMP_MAX_HEADER_SIZE);
+
+    fprintf(stdout, "Sending pong %d\n", ping_t);
+    return rtmp_send(r, &packet);
+}
+
 static int read_bytes(rtmp *r, uint8_t *p, int howmany)
 {
     int len;
@@ -424,8 +446,8 @@ static int handle_control(rtmp *r, rtmp_packet *pkt)
         body += 4;
         break;
     case PING:
-        // TODO send ping response
-        fprintf(stderr, "Received ping; response unimplemented!\n");
+        send_pong(r, amf_read_i32(body), pkt->timestamp + 1);
+        body += 4;
         break;
     case SET_BUF_LEN:
         // XXX use this to set the tx rate?
