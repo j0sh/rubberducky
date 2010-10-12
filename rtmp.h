@@ -67,7 +67,8 @@ typedef struct rtmp_stream {
 typedef struct rtmp {
     int fd;
     int off; // handshake offset. When off == 0, signals pre-FP9 cxns
-    int chunk_size; // max 65546 bytes
+    int in_chunk_size; // max 65546 bytes
+    int out_chunk_size;
     uint32_t ack_size; // acknowledgement window
     uint32_t prev_ack;
     uint32_t rx;

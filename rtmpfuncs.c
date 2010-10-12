@@ -12,7 +12,8 @@
 void rtmp_init(rtmp *r)
 {
     memset(r, 0, sizeof(rtmp));
-    r->chunk_size = RTMP_DEFAULT_CHUNKSIZE;
+    r->out_chunk_size = RTMP_DEFAULT_CHUNKSIZE;
+    r->in_chunk_size = RTMP_DEFAULT_CHUNKSIZE;
     r->ack_size   = RTMP_DEFAULT_ACK;
 }
 
@@ -104,7 +105,7 @@ int rtmp_send(rtmp *r, rtmp_packet *pkt) {
     start      = header;
     body       = pkt->body;
     to_write   = pkt->size;
-    chunk_size = r->chunk_size;
+    chunk_size = r->out_chunk_size;
 
     // encode header proper
     header += chunk_header_size; // fast-forward; skip chunk hdr for now

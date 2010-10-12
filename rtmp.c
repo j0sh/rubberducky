@@ -473,6 +473,8 @@ static int handle_msg(rtmp *r, struct rtmp_packet *pkt, ev_io *io)
 {
     switch (pkt->msg_type) {
     case 0x01: // set chunk size
+        r->out_chunk_size = amf_read_i32(pkt->body);
+        break;
     case 0x02: // abort message
         break;
     case 0x03:
@@ -607,8 +609,8 @@ static int process_packet(ev_io *io)
     }
 
     // copy packet data
-    chunk_size = r->chunk_size < (pkt->size - pkt->read) ?
-                 r->chunk_size : (pkt->size - pkt->read);
+    chunk_size = r->in_chunk_size < (pkt->size - pkt->read) ?
+                 r->in_chunk_size : (pkt->size - pkt->read);
 
         // copy over any data leftover from header buffer
         int leftover = r->hdr_bytes - (p - r->hdr);
