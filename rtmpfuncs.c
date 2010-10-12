@@ -13,6 +13,7 @@ void rtmp_init(rtmp *r)
 {
     memset(r, 0, sizeof(rtmp));
     r->chunk_size = RTMP_DEFAULT_CHUNKSIZE;
+    r->ack_size   = RTMP_DEFAULT_ACK;
 }
 
 void rtmp_free_stream(rtmp_stream **stream)

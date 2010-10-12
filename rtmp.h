@@ -20,6 +20,7 @@
 #define RTMP_CHANNELS 65600
 #define RTMP_DEFAULT_CHUNKSIZE 128
 #define RTMP_PORT 1935
+#define RTMP_DEFAULT_ACK 2500000
 
 // arbitrary constants, not protocol specific
 #define RTMP_MAX_STREAMS 16
@@ -67,6 +68,8 @@ typedef struct rtmp {
     int fd;
     int off; // handshake offset. When off == 0, signals pre-FP9 cxns
     int chunk_size; // max 65546 bytes
+    uint32_t ack_size; // acknowledgement window
+    uint32_t prev_ack;
     uint32_t rx;
     uint32_t tx;
     amf_encoding encoding;

@@ -175,6 +175,26 @@ static inline rtmp* get_rtmp(ev_io *w)
     return (rtmp*)((uint8_t*)w - offsetof(rtmp, read_watcher));
 }
 
+static int send_ack(rtmp *r, int ts)
+{
+    uint8_t pbuf[RTMP_MAX_HEADER_SIZE + 4] = { 0 };
+    uint8_t *body = pbuf + RTMP_MAX_HEADER_SIZE,
+            *end = pbuf + sizeof(pbuf);
+    rtmp_packet packet = {
+        .chunk_id  = 0x02,
+        .msg_id    = 0,
+        .msg_type  = 0x03,
+        .timestamp = ts,
+        .size      = end - body,
+        .body      = body
+    };
+
+    amf_write_i32(body, end, r->rx);
+
+    fprintf(stdout, "Sending ack for %d bytes\n", r->rx);
+    return rtmp_send(r, &packet);
+}
+
 static int read_bytes(rtmp *r, uint8_t *p, int howmany)
 {
     int len;
@@ -186,7 +206,12 @@ static int read_bytes(rtmp *r, uint8_t *p, int howmany)
     }
     if (len > 0)
         r->rx += len;
-    // TODO send return report if rx exceeds ack size
+
+    // send return report if rx exceeds ack window
+    if (r->rx >= r->prev_ack + r->ack_size) {
+        send_ack(r, 0); // TODO fix timestamp
+        r->prev_ack = r->rx;
+    }
     return len ;
 }
 
