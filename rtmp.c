@@ -217,6 +217,24 @@ static int send_pong(rtmp *r, uint32_t ping_t, int ts)
     return rtmp_send(r, &packet);
 }
 
+static int send_ack_size(rtmp *r, int ts)
+{
+    uint8_t pbuf[RTMP_MAX_HEADER_SIZE + 4] = { 0 };
+    rtmp_packet packet = {
+        .chunk_id = 0x02,
+        .msg_id   = 0,
+        .msg_type = 0x05,
+        .timestamp = ts,
+        .size = sizeof(pbuf) - RTMP_MAX_HEADER_SIZE,
+        .body = pbuf + RTMP_MAX_HEADER_SIZE
+    };
+
+    amf_write_i32(pbuf + RTMP_MAX_HEADER_SIZE, pbuf + sizeof(pbuf), r->ack_size);
+
+    fprintf(stdout, "Sending ack window for size %d\n", r->ack_size);
+    return rtmp_send(r, &packet);
+}
+
 static int read_bytes(rtmp *r, uint8_t *p, int howmany)
 {
     int len;
@@ -469,6 +487,24 @@ control_error:
     return -1;
 }
 
+static int handle_setpeerbw(rtmp *r, rtmp_packet *pkt)
+{
+    int ack;
+    if (pkt->size < 4)
+        goto peerbw_fail;
+    ack = amf_read_i32(pkt->body);
+    if (ack != r->ack_size) {
+        r->ack_size = ack;
+        return send_ack_size(r, pkt->timestamp + 1);
+    }
+
+    return 0;
+
+peerbw_fail:
+    fprintf(stderr, "Not enough bytes when reading peer bw packet.\n");
+    return -1;
+}
+
 static int handle_msg(rtmp *r, struct rtmp_packet *pkt, ev_io *io)
 {
     switch (pkt->msg_type) {
@@ -486,7 +522,9 @@ static int handle_msg(rtmp *r, struct rtmp_packet *pkt, ev_io *io)
     case 0x05:
         fprintf(stdout, "Set Ack Size: %d\n", amf_read_i32(pkt->body));
         break;
-    case 0x06: // set window ack size. TODO send 0x03 pkt if size differs
+    case 0x06: // set window ack size.
+        handle_setpeerbw(r, pkt);
+        break;
     case 0x07: // for edge-origin distribution
         break;
     case 0x08:
