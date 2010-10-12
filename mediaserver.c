@@ -148,6 +148,7 @@ static void rtmp_read_cb(rtmp *r, struct rtmp_packet *pkt, void *opaque)
     case 0x08:
     case 0x09:
         break; // audio and video
+    case 0x11: // Flex message
     case 0x14:
         rtmp_invoke(r, pkt, ctx);
         break;

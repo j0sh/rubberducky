@@ -389,6 +389,13 @@ void rtmp_invoke(rtmp *rtmp, rtmp_packet *pkt, srv_ctx *ctx)
     AMFObject obj;
     AVal method, val;
 
+    while (!*body){
+        // for the fucked case in which: type 11 (Flex/AMF3) message
+        // is received but in AMF0 format, *and* prefixed with an
+        // an extra zero byte. Flash sux
+        body++;
+        pkt_len--;
+    }
     if (body[0] != 0x02) // sanity check
     {
         errstr = "Body not 0x02";
