@@ -392,6 +392,61 @@ static int handshake2(ev_io *io)
         return 1;
     }
 
+enum {
+    STREAM_BEGIN,
+    STREAM_EOF,
+    STREAM_DRY,
+    SET_BUF_LEN,
+    STREAM_RECORDED,
+    PING,
+    PONG
+}; // control types
+
+static int handle_control(rtmp *r, rtmp_packet *pkt)
+{
+    int ctrl_type;
+    uint8_t *body = pkt->body;
+
+    if (pkt->size < 6) // includes 4-byte that is common to all types
+        goto control_error;
+
+    ctrl_type = amf_read_i16(body);
+    body += 2;
+
+    switch (ctrl_type) {
+    case STREAM_BEGIN:
+    case STREAM_EOF:
+    case STREAM_DRY:
+    case STREAM_RECORDED:
+    case PONG:
+        fprintf(stdout, "control %d, value %d\n",
+                ctrl_type, amf_read_i32(body));
+        body += 4;
+        break;
+    case PING:
+        // TODO send ping response
+        fprintf(stderr, "Received ping; response unimplemented!\n");
+        break;
+    case SET_BUF_LEN:
+        // XXX use this to set the tx rate?
+        if (pkt->size < 8)
+            goto control_error;
+        fprintf(stdout, "setting buffer length: stream %d, %d-ms buffer\n",
+                amf_read_i32(body), amf_read_i32(body + 4));
+        body += 8;
+        break;
+    default:
+        fprintf(stderr, "Unknown control type.\n");
+        goto control_error;
+    }
+
+    return 0;
+
+control_error:
+    fprintf(stderr, "Not enough bytes in control packet, exiting.\n");
+    return -1;
+}
+
 static int handle_msg(rtmp *r, struct rtmp_packet *pkt, ev_io *io)
 {
     switch (pkt->msg_type) {
@@ -400,6 +455,9 @@ static int handle_msg(rtmp *r, struct rtmp_packet *pkt, ev_io *io)
         break;
     case 0x03:
         fprintf(stdout, "Ack: %d Bytes Read\n", amf_read_i32(pkt->body));
+        break;
+    case 0x04:
+        handle_control(r, pkt);
         break;
     case 0x05:
         fprintf(stdout, "Set Ack Size: %d\n", amf_read_i32(pkt->body));
