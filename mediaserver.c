@@ -135,26 +135,8 @@ static void close_cb(struct ev_loop *loop, ev_signal *signal, int revents)
     free_all((srv_ctx*)signal->data);
 }
 
-static void rtmp_read_cb(rtmp *r, struct rtmp_packet *pkt, void *opaque)
+static void read_cb(rtmp *r, rtmp_packet *pkt, void *opaque)
 {
-    srv_ctx *ctx = (srv_ctx*)opaque;
-    switch(pkt->msg_type) {
-    case 0x03:
-        fprintf(stdout, "Ack: %d Bytes Read\n", AMF_DecodeInt32(pkt->body));
-        break;
-    case 0x05:
-        fprintf(stdout, "Set Ack Size: %d\n", AMF_DecodeInt32(pkt->body));
-        break;
-    case 0x08:
-    case 0x09:
-        break; // audio and video
-    case 0x11: // Flex message
-    case 0x14:
-        rtmp_invoke(r, pkt, ctx);
-        break;
-    default:
-        fprintf(stdout, "default in cb: %d\n", pkt->msg_type);
-    }
 }
 
 static void incoming_cb(struct ev_loop *loop, ev_io *io, int revents)
@@ -185,7 +167,7 @@ static void incoming_cb(struct ev_loop *loop, ev_io *io, int revents)
     rtmp_init(&client->rtmp);
     client->rtmp.fd = clientfd;
     client->rtmp.read_watcher.data = ctx;
-    client->rtmp.read_cb = rtmp_read_cb;
+    client->rtmp.read_cb = read_cb;
 
     fcntl(clientfd, F_SETFL, O_NONBLOCK);
 

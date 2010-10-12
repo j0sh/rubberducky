@@ -14,8 +14,6 @@
 #include <openssl/sha.h>
 #include <openssl/hmac.h>
 
-#include <librtmp/amf.h>
-
 #if OPENSSL_VERSION_NUMBER < 0x0090800 || !defined(SHA256_DIGEST_LENGTH)
 #error Your OpenSSL is too old, need 0.9.8 or newer with SHA256
 #endif
@@ -25,7 +23,9 @@
 
 /* local includes */
 #include "rtmp.h"
+#include "amf.h"
 #include "mediaserver.h"
+#include "process_messages.h"
 
 #define RTMP_SIG_SIZE 1536
 #define SHA256_DIGEST_LENGTH 32
@@ -368,10 +368,39 @@ static int handshake2(ev_io *io)
         return 1;
     }
 
+static int handle_msg(rtmp *r, struct rtmp_packet *pkt, ev_io *io)
+{
+    switch (pkt->msg_type) {
+    case 0x01: // set chunk size
+    case 0x02: // abort message
+        break;
+    case 0x03:
+        fprintf(stdout, "Ack: %d Bytes Read\n", amf_read_i32(pkt->body));
+        break;
+    case 0x05:
+        fprintf(stdout, "Set Ack Size: %d\n", amf_read_i32(pkt->body));
+        break;
+    case 0x06: // set window ack size. TODO send 0x03 pkt if size differs
+    case 0x07: // for edge-origin distribution
+        break;
+    case 0x08:
+    case 0x09:
+        break; // audio and video
+    case 0x11: // Flex message
+    case 0x14:
+        rtmp_invoke(r, pkt, io->data);
+        break;
+    default:
+        fprintf(stdout, "default in cb: 0x%x\n", pkt->msg_type);
+    }
+    if (r->read_cb)
+        r->read_cb(r, pkt, io->data);
+    return 0;
+}
+
 static int process_packet(ev_io *io)
 {
     rtmp *r = get_rtmp(io);
-    srv_ctx *ctx = io->data;
     int header_type, chunk_id, chunk_size, to_increment = 0, copy_header = 0;
     rtmp_packet *pkt = r->prev_pkt;
     uint8_t *p, *pe;
@@ -424,18 +453,18 @@ static int process_packet(ev_io *io)
     switch (header_type) {
     case CHUNK_LARGE:
         if ((pe - p) < CHUNK_SIZE_LARGE) goto parse_pkt_fail;
-        pkt->msg_id = AMF_DecodeInt32((const char *)&p[7]);
+        pkt->msg_id = amf_read_i32(&p[7]);
         to_increment += 4;
     case CHUNK_MEDIUM:
         if ((pe - p) < CHUNK_SIZE_MEDIUM ) goto parse_pkt_fail;
         pkt->msg_type = p[6];
-        pkt->size = AMF_DecodeInt24((const char*)&p[3]); // size exclusive of header
+        pkt->size = amf_read_i24(&p[3]); // size exclusive of header
         pkt->read = 0;
         to_increment += 4;
     case CHUNK_SMALL: {
         uint32_t ts;
         if ((pe - p) < CHUNK_SIZE_SMALL) goto parse_pkt_fail; // XXX error out
-        ts = AMF_DecodeInt24((const char*)p);
+        ts = amf_read_i24(p);
         to_increment += 3;
         if (0xffffff == ts) {
             // read in extended timestamp
@@ -445,7 +474,7 @@ static int process_packet(ev_io *io)
             int hsize = header_sizes[header_type];
             if (p + hsize + 4 > pe) goto parse_pkt_fail;
 
-            ts = AMF_DecodeInt32((const char*)p+hsize);
+            ts = amf_read_i32(p+hsize);
             to_increment += 4;
         }
         if (!header_type)
@@ -547,8 +576,8 @@ static int process_packet(ev_io *io)
                         "msg id",      pkt->msg_id,
                         "chunksize",   chunk_size);
     */
-    if (pkt->read == pkt->size && r->read_cb) {
-        r->read_cb(r, pkt, ctx);
+    if (pkt->read == pkt->size) {
+        handle_msg(r, pkt, io);
         pkt->read = 0;
     }
     return 1;
