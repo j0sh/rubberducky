@@ -13,6 +13,7 @@
 #include <librtmp/amf.h>
 
 #include "process_messages.h"
+#include "amf.h"
 
 // yanked wholesale from librtmp
 #define SAVC(x) static const AVal av_##x = AVC(#x)
@@ -25,15 +26,6 @@ SAVC(pageUrl);
 SAVC(audioCodecs);
 SAVC(videoCodecs);
 SAVC(objectEncoding);
-
-// server connect parms
-SAVC(_result);
-SAVC(fmsVer);
-SAVC(capabilities);
-SAVC(mode);
-SAVC(level);
-SAVC(code);
-SAVC(description);
 
 // other netconnection commands
 SAVC(releaseStream);
@@ -49,7 +41,7 @@ SAVC(play);
 static int set_peer_bw(rtmp *rtmp)
 {
     uint8_t pbuf[RTMP_MAX_HEADER_SIZE+5] = {0};
-    AMF_EncodeInt32(pbuf + RTMP_MAX_HEADER_SIZE, pbuf + RTMP_MAX_HEADER_SIZE + 4, 0x0fffffff);
+    amf_write_i32(pbuf + RTMP_MAX_HEADER_SIZE, pbuf + RTMP_MAX_HEADER_SIZE + 4, 0x0fffffff);
     pbuf[RTMP_MAX_HEADER_SIZE + 4] = 2;
     rtmp_packet packet = {
         .chunk_id = 0x02,
@@ -66,7 +58,7 @@ static int set_peer_bw(rtmp *rtmp)
 static int window_ack_size(rtmp *rtmp)
 {
     uint8_t pbuf[RTMP_MAX_HEADER_SIZE + 4] = { 0 };
-    AMF_EncodeInt32(pbuf + RTMP_MAX_HEADER_SIZE, pbuf + RTMP_MAX_HEADER_SIZE + 4, 0x0fffffff);
+    amf_write_i32(pbuf + RTMP_MAX_HEADER_SIZE, pbuf + RTMP_MAX_HEADER_SIZE + 4, 0x0fffffff);
     rtmp_packet packet = {
         .chunk_id = 0x02,
         .msg_id = 0,
@@ -82,7 +74,7 @@ static int send_ping(rtmp *rtmp)
 {
     time_t now = time(NULL);
     uint8_t pbuf[RTMP_MAX_HEADER_SIZE+4];
-    AMF_EncodeInt32(pbuf + RTMP_MAX_HEADER_SIZE, pbuf + sizeof(pbuf), now);
+    amf_write_i32(pbuf + RTMP_MAX_HEADER_SIZE, pbuf + sizeof(pbuf), now);
     memset(pbuf, 0, RTMP_MAX_HEADER_SIZE);
     rtmp_packet packet = {
         .chunk_id = 0x02,
@@ -100,10 +92,10 @@ static int send_result(rtmp *rtmp, double txn, double stream_id)
 {
     uint8_t pbuf[128], *end = pbuf+sizeof(pbuf), *enc = pbuf+RTMP_MAX_HEADER_SIZE, *foo;
     memset(pbuf, 0, RTMP_MAX_HEADER_SIZE);
-    enc = AMF_EncodeString(enc, end, &av__result);
-    enc = AMF_EncodeNumber(enc, end, txn);
+    enc = amf_write_str(enc, end, "_result");
+    enc = amf_write_dbl(enc, end, txn);
     *enc++ = AMF_NULL; //command object
-    enc = AMF_EncodeNumber(enc, end, stream_id); // IS THIS A HEADER?!?
+    enc = amf_write_dbl(enc, end, stream_id); // IS THIS A HEADER?!?
     foo = pbuf+RTMP_MAX_HEADER_SIZE;
     rtmp_packet packet = {
         .chunk_id = 0x03,
@@ -119,11 +111,10 @@ static int send_result(rtmp *rtmp, double txn, double stream_id)
 static int send_onbw_done(rtmp *rtmp)
 {
     // i have never actually seen a flash client make use of this.
-    SAVC(onBWDone);
     uint8_t pbuf[128], *end = pbuf+sizeof(pbuf), *enc = pbuf+RTMP_MAX_HEADER_SIZE, *foo;
     memset(pbuf, 0, RTMP_MAX_HEADER_SIZE); // to shut up valgrind
-    enc = AMF_EncodeString(enc, end, &av_onBWDone);
-    enc = AMF_EncodeNumber(enc, end, 0);
+    enc = amf_write_str(enc, end, "onBWDone");
+    enc = amf_write_dbl(enc, end, 0);
     *enc++ = AMF_NULL; // command object
     foo = pbuf+RTMP_MAX_HEADER_SIZE;
     rtmp_packet packet = {
@@ -144,7 +135,6 @@ static int send_cxn_resp(rtmp *rtmp, double txn)
     memset(pbuf, 0, RTMP_MAX_HEADER_SIZE);
   AMFObject obj;
   AMFObjectProperty p, op;
-  AVal av;
 
     packet.chunk_id = 0x03; // control channel
     packet.chunk_type = CHUNK_MEDIUM;
@@ -154,27 +144,23 @@ static int send_cxn_resp(rtmp *rtmp, double txn)
     packet.body = pbuf + RTMP_MAX_HEADER_SIZE;
 
     memset(pbuf, 0, RTMP_MAX_HEADER_SIZE);
-    enc = AMF_EncodeString(packet.body, pend, &av__result);
-  enc = AMF_EncodeNumber(enc, pend, txn);
+  enc = amf_write_str(packet.body, pend, "_result");
+  enc = amf_write_dbl(enc, pend, txn);
   *enc++ = AMF_OBJECT;
 
-  STR2AVAL(av, "FMS/3,5,1,525");
-  enc = AMF_EncodeNamedString(enc, pend, &av_fmsVer, &av);
-  enc = AMF_EncodeNamedNumber(enc, pend, &av_capabilities, 31.0);
-  enc = AMF_EncodeNamedNumber(enc, pend, &av_mode, 1.0);
+  enc = amf_write_str_kv(enc, pend, "fmsVer", "FMS/3,5,1,525");
+  enc = amf_write_dbl_kv(enc, pend, "capabilities", 31.0);
+  enc = amf_write_dbl_kv(enc, pend, "mode", 1.0);
   *enc++ = 0;
   *enc++ = 0;
   *enc++ = AMF_OBJECT_END;
 
   *enc++ = AMF_OBJECT;
 
-  STR2AVAL(av, "status");
-  enc = AMF_EncodeNamedString(enc, pend, &av_level, &av);
-  STR2AVAL(av, "NetConnection.Connect.Success");
-  enc = AMF_EncodeNamedString(enc, pend, &av_code, &av);
-  STR2AVAL(av, "Connection succeeded.");
-  enc = AMF_EncodeNamedString(enc, pend, &av_description, &av);
-  enc = AMF_EncodeNamedNumber(enc, pend, &av_objectEncoding, rtmp->encoding);
+  enc = amf_write_str_kv(enc, pend, "level", "status");
+  enc = amf_write_str_kv(enc, pend, "code", "NetConnection.Connect.Success");
+  enc = amf_write_str_kv(enc, pend, "description", "Connection succeeded.");
+  enc = amf_write_dbl_kv(enc, pend, "objectEncoding", rtmp->encoding);
   STR2AVAL(p.p_name, "version");
   STR2AVAL(p.p_vu.p_aval, "3,5,1,525");
   p.p_type = AMF_STRING;
@@ -183,7 +169,7 @@ static int send_cxn_resp(rtmp *rtmp, double txn)
   op.p_type = AMF_OBJECT;  // nested
   STR2AVAL(op.p_name, "data");
   op.p_vu.p_object = obj;
-  enc = AMFProp_Encode(&op, enc, pend);
+  enc = (uint8_t*)AMFProp_Encode(&op, (char*)enc, (char*)pend);
   *enc++ = 0;
   *enc++ = 0;
   *enc++ = AMF_OBJECT_END;
@@ -196,34 +182,32 @@ static int send_cxn_resp(rtmp *rtmp, double txn)
 }
 
 typedef enum {publish = 0, unpublish, play} stream_cmd;
-static int send_fcpublish(rtmp *rtmp, AVal *streamname,
+static int send_fcpublish(rtmp *rtmp, const char *streamname,
                           double txn, stream_cmd action)
 {
     uint8_t pbuf[256], *end = pbuf+sizeof(pbuf), *enc = pbuf+RTMP_MAX_HEADER_SIZE, *foo;
     memset(pbuf, 0, RTMP_MAX_HEADER_SIZE);
-    AVal key, value;
+    const char *key, *value;
     switch (action) {
     case publish:
-        STR2AVAL(key, "onFCPublish");
-        STR2AVAL(value, "NetStream.Publish.Start");
+        key = "onFCPublish";
+        value = "NetStream.Publish.Start";
         break;
     case unpublish:
-        STR2AVAL(key, "onFCUnpublish");
-        STR2AVAL(value, "NetStream.Unpublish.Success");
+        key = "onFCUnpublish";
+        value = "NetStream.Unpublish.Success";
         break;
     default:
-        STR2AVAL(value, "We.fucked.up.sorry");
+        value = "We.fucked.up.sorry";
     }
 
-    enc = AMF_EncodeString(enc, end, &key);
-    enc = AMF_EncodeNumber(enc, end, txn);
+    enc = amf_write_str(enc, end, key);
+    enc = amf_write_dbl(enc, end, txn);
     *enc++ = AMF_NULL; // command object
 
     *enc++ = AMF_OBJECT;
-    STR2AVAL(key, "code");
-    enc = AMF_EncodeNamedString(enc, end, &key, &value);
-    STR2AVAL(key, "description");
-    enc = AMF_EncodeNamedString(enc, end, &key, streamname);
+    enc = amf_write_str_kv(enc, end, "code", value);
+    enc = amf_write_str_kv(enc, end, "description", streamname);
     *enc++ = 0;
     *enc++ = 0;
     *enc++ = AMF_OBJECT_END;
@@ -244,12 +228,10 @@ static int send_fcpublish(rtmp *rtmp, AVal *streamname,
 static int send_onstatus(rtmp *rtmp, char *streamname, stream_cmd action)
 {
     uint8_t pbuf[256], *end = pbuf+sizeof(pbuf), *enc = pbuf+RTMP_MAX_HEADER_SIZE, *foo;
-    uint8_t tbuf[64], pubstr[64]; //XXX this might not be enough later on
+    char tbuf[64], pubstr[64]; //XXX this might not be enough later on
     memset(pbuf, 0, RTMP_MAX_HEADER_SIZE);
-    AVal key, value;
-    STR2AVAL(value, "onStatus");
-    enc = AMF_EncodeString(enc, end, &value);
-    enc = AMF_EncodeNumber(enc, end, 0); // transaction id
+    enc = amf_write_str(enc, end, "onStatus");
+    enc = amf_write_dbl(enc, end, 0); // transaction id
     *enc++ = AMF_NULL; // command object
 
     // TODO checks to enforce string bounds here (and everywhere else)
@@ -274,18 +256,10 @@ static int send_onstatus(rtmp *rtmp, char *streamname, stream_cmd action)
     }
 
     *enc++ = AMF_OBJECT;
-    STR2AVAL(key, "level");
-    STR2AVAL(value, "status");
-    enc = AMF_EncodeNamedString(enc, end, &key, &value);
-    STR2AVAL(key, "code");
-    STR2AVAL(value, pubstr);
-    enc = AMF_EncodeNamedString(enc, end, &key, &value);
-    STR2AVAL(key, "description");
-    STR2AVAL(value, tbuf);
-    enc = AMF_EncodeNamedString(enc, end, &key, &value);
-    STR2AVAL(key, "clientid");
-    STR2AVAL(value, "RUBBERDUCKY"); //XXX fix
-    enc = AMF_EncodeNamedString(enc, end, &key, &value);
+    enc = amf_write_str_kv(enc, end, "level", "status");
+    enc = amf_write_str_kv(enc, end, "code", pubstr);
+    enc = amf_write_str_kv(enc, end, "description", tbuf);
+    enc = amf_write_str_kv(enc, end, "clientid", "RUBBERDUCKY"); // TODO fix
     *enc++ = 0;
     *enc++ = 0;
     *enc++ = AMF_OBJECT_END;
@@ -401,7 +375,7 @@ void rtmp_invoke(rtmp *rtmp, rtmp_packet *pkt, srv_ctx *ctx)
         errstr = "Body not 0x02";
         goto invoke_error;
     }
-    if((pkt_len = AMF_Decode(&obj, body, pkt_len, FALSE)) < 0)
+    if((pkt_len = AMF_Decode(&obj, (char*)body, pkt_len, FALSE)) < 0)
     {
         errstr = "Error decoding AMF object";
         goto invoke_error;
@@ -424,12 +398,12 @@ void rtmp_invoke(rtmp *rtmp, rtmp_packet *pkt, srv_ctx *ctx)
     {
         send_result(rtmp, txn, 6);
         AMFProp_GetString(AMF_GetProp(&obj, NULL, 3), &val);
-        send_fcpublish(rtmp, &val, txn, publish);
+        send_fcpublish(rtmp, val.av_val, txn, publish);
     } else if(AVMATCH(&method, &av_FCUnpublish))
     {
         send_result(rtmp, txn, 0);
         AMFProp_GetString(AMF_GetProp(&obj, NULL, 3), &val);
-        send_fcpublish(rtmp, &val, txn, unpublish);
+        send_fcpublish(rtmp, val.av_val, txn, unpublish);
     } else if(AVMATCH(&method, &av_createStream))
     {
         send_result(rtmp, txn, 0);

@@ -5,5 +5,5 @@ OPTS=-g
 CC=gcc
 
 default:
-	$(CC) $(OPTS) $(DEPS) mediaserver.c process_messages.c rtmp.c rtmpfuncs.c
+	$(CC) $(OPTS) $(DEPS) mediaserver.c process_messages.c rtmp.c rtmpfuncs.c amf.c
 

@@ -1,4 +1,5 @@
 #include "rtmp.h"
+#include "amf.h"
 
 #include <string.h>
 #include <stdlib.h>
@@ -7,8 +8,6 @@
 
 #include <sys/socket.h>
 #include <unistd.h>
-
-#include <librtmp/amf.h>
 
 void rtmp_init(rtmp *r)
 {
@@ -57,7 +56,6 @@ int rtmp_send(rtmp *r, rtmp_packet *pkt) {
     rtmp_packet *prev = r->out_channels[pkt->chunk_id];
     uint32_t ts = pkt->timestamp;
     uint8_t *header, *start, *body;
-    char *amf_header; //work around compiler warnings
     int header_size, chunk_header_size, chunk_size, to_write;
 
     if (prev && CHUNK_LARGE != pkt->chunk_type) {
@@ -97,7 +95,7 @@ int rtmp_send(rtmp *r, rtmp_packet *pkt) {
     if (ts >= 0xffffff) {
         header_size += 4;
         // just write the extended timestamp now
-        AMF_EncodeInt32((char*)pkt->body - 4, (char*)pkt->body, ts);
+        amf_write_i32(pkt->body - 4, pkt->body, ts);
     }
 
     // XXX make sure there is room behind the packet body!
@@ -109,15 +107,14 @@ int rtmp_send(rtmp *r, rtmp_packet *pkt) {
 
     // encode header proper
     header += chunk_header_size; // fast-forward; skip chunk hdr for now
-    amf_header = (char*)header; // quieten compiler
     switch (pkt->chunk_type) {
     case CHUNK_LARGE:
-        AMF_EncodeInt24(&amf_header[7], &amf_header[7]+header_size, pkt->msg_id);
+        amf_write_i24(&header[7], &header[7]+header_size, pkt->msg_id);
     case CHUNK_MEDIUM:
-        amf_header[6] = pkt->msg_type;
-        AMF_EncodeInt24(&amf_header[3], &amf_header[3]+header_size, pkt->size);
+        header[6] = pkt->msg_type;
+        amf_write_i24(&header[3], &header[3]+header_size, pkt->size);
     case CHUNK_SMALL:
-        AMF_EncodeInt24(amf_header, amf_header+header_size, ts > 0xffffff ? 0xffffff : ts);
+        amf_write_i24(header, header+header_size, ts > 0xffffff ? 0xffffff : ts);
     case CHUNK_TINY:
         break;
     }
