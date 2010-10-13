@@ -47,6 +47,12 @@ typedef enum amf_encoding { AMF0 = 0,
                             AMF3 = 3
 }amf_encoding;
 
+typedef enum {  VOD = 0,
+                LIVE,
+                RECORD,
+                APPEND
+}stream_type;
+
 typedef struct rtmp_packet {
     int chunk_id;
     int msg_id; // stream id?
@@ -61,6 +67,7 @@ typedef struct rtmp_packet {
 
 typedef struct rtmp_stream {
     int id;
+    int type;
     char *name;
 }rtmp_stream;
 

@@ -431,6 +431,14 @@ void rtmp_invoke(rtmp *rtmp, rtmp_packet *pkt, srv_ctx *ctx)
                 strncpy(stream->name, val.av_val, val.av_len);
                 stream->name[val.av_len] = '\0';
                 stream->id = pkt->msg_id;
+
+                if (!strcmp(type.av_val, "live")) {
+                    stream->type = LIVE;
+                } else if (!strcmp(type.av_val, "record")) {
+                    stream->type = RECORD;
+                } else if (!strcmp(type.av_val, "append")) {
+                    stream->type = APPEND;
+                }
                 rtmp->streams[i] = stream;
                 break;
             }
