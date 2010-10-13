@@ -401,6 +401,7 @@ static int handshake2(ev_io *io)
         return RTMPERR(EAGAIN);
         }
 
+#if 0
         // FP9 only
         if (r->off) {
             uint8_t signature[SHA256_DIGEST_LENGTH];
@@ -419,6 +420,7 @@ static int handshake2(ev_io *io)
         }
         // we should verify the bytes returned match in pre-fp9 handshakes
         // but: Postel's Law.
+#endif
 
         fprintf(stdout, "Great success: client handshake successful!\n");
         free(pkt->body);
