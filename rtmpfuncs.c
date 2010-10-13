@@ -20,10 +20,11 @@ void rtmp_init(rtmp *r)
 void rtmp_free_stream(rtmp_stream **stream)
 {
     rtmp_stream *s = *stream;
+    if (!s) return;
     if (s->name) free(s->name);
     s->name = NULL;
     free(s);
-    s = NULL;
+    *stream = NULL;
 }
 
 static void free_packet(rtmp_packet **packet) {

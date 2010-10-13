@@ -432,11 +432,14 @@ void rtmp_invoke(rtmp *rtmp, rtmp_packet *pkt, srv_ctx *ctx)
                 stream->name[val.av_len] = '\0';
                 stream->id = pkt->msg_id;
 
-                if (!strcmp(type.av_val, "live")) {
+                // use strncmp variant because the type is not likely to
+                // be null-terminated, so avoid a 1-byte overread. Note
+                // the type is usually the last element in the packet body
+                if (!strncmp(type.av_val, "live", 4)) {
                     stream->type = LIVE;
-                } else if (!strcmp(type.av_val, "record")) {
+                } else if (!strncmp(type.av_val, "record", 6)) {
                     stream->type = RECORD;
-                } else if (!strcmp(type.av_val, "append")) {
+                } else if (!strncmp(type.av_val, "append", 6)) {
                     stream->type = APPEND;
                 }
                 rtmp->streams[i] = stream;
