@@ -1,7 +1,7 @@
 
 PKGCFG_DEPS=librtmp openssl
 DEPS=-lev `pkg-config --cflags --libs $(PKGCFG_DEPS)`
-OPTS=-g
+OPTS=-g -Wall
 CC=gcc
 
 default:

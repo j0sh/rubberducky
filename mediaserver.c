@@ -25,7 +25,8 @@
 #define HOSTNAME "moneypenny"
 #define RTMP_PORT_STRING  QUOTEVALUE(RTMP_PORT)
 
-static int resolve_host(struct sockaddr_in *addr, const char *hostname)
+static int resolve_host(struct sockaddr_in *addr,
+                        const char *hostname, const char *port)
 {
     /* hostname lookup might not be needed */
     if (!inet_aton(hostname, &addr->sin_addr))
@@ -34,7 +35,7 @@ static int resolve_host(struct sockaddr_in *addr, const char *hostname)
         memset(&hints, 0, sizeof(hints));
         hints.ai_family = AF_INET;
         hints.ai_socktype = SOCK_STREAM;
-        if (getaddrinfo(hostname, addr->sin_zero, NULL, &res)) {
+        if (getaddrinfo(hostname, port, NULL, &res)) {
             return -1;
         }
 
@@ -65,9 +66,7 @@ static int setup_socket(const char *hostname, int port)
     addr.sin_port = htons(RTMP_PORT);
     setsockopt(sockfd, SOL_SOCKET, SO_REUSEADDR, &tmp, sizeof(tmp));
 
-    /* forgive those of us who have sinned */
-    memcpy(addr.sin_zero, RTMP_PORT_STRING, sizeof(RTMP_PORT_STRING));
-    if (resolve_host(&addr, HOSTNAME)) {
+    if (resolve_host(&addr, HOSTNAME, QUOTEVALUE(RTMP_PORT))) {
         errstr = "Failed to resolve host";
         goto fail;
     }
@@ -141,7 +140,8 @@ static void read_cb(rtmp *r, rtmp_packet *pkt, void *opaque)
 
 static void incoming_cb(struct ev_loop *loop, ev_io *io, int revents)
 {
-    int clientfd, len = 0;
+    int clientfd;
+    socklen_t len = 0; // weird type to sate the compiler
     srv_ctx *ctx = io->data;
     client_ctx *client;
     struct sockaddr_in addr = {0};
