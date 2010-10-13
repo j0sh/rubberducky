@@ -12,7 +12,7 @@
 
 #include <librtmp/amf.h>
 
-#include "process_messages.h"
+#include "mediaserver.h"
 #include "amf.h"
 
 // yanked wholesale from librtmp

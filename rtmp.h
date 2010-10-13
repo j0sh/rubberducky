@@ -19,6 +19,7 @@
 #define RTMP_MAX_HEADER_SIZE 18
 #define RTMP_CHANNELS 65600
 #define RTMP_DEFAULT_CHUNKSIZE 128
+#define RTMP_PORT 1935
 
 // arbitrary constants, not protocol specific
 #define RTMP_MAX_STREAMS 16

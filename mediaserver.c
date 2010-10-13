@@ -19,11 +19,11 @@
 /* local includes */
 #include "mediaserver.h"
 #include "rtmp.h"
-#include "process_messages.h"
 
 #define BACKLOG           20
 
 #define HOSTNAME "moneypenny"
+#define RTMP_PORT_STRING  QUOTEVALUE(RTMP_PORT)
 
 static int resolve_host(struct sockaddr_in *addr, const char *hostname)
 {

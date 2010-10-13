@@ -25,7 +25,6 @@
 #include "rtmp.h"
 #include "amf.h"
 #include "mediaserver.h"
-#include "process_messages.h"
 
 #define RTMP_SIG_SIZE 1536
 #define SHA256_DIGEST_LENGTH 32

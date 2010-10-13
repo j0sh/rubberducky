@@ -13,6 +13,9 @@
 #endif
 #endif
 
+#define QUOTELITERAL(x) #x
+#define QUOTEVALUE(x) QUOTELITERAL(x)
+
 typedef struct client_ctx {
     int id;
     rtmp rtmp;
@@ -27,5 +30,8 @@ typedef struct srv_ctx {
     ev_io io;             /* socket listener event */
     client_ctx *clients;
 }srv_ctx;
+
+// TODO temporary; refactor into rtmp
+void rtmp_invoke(rtmp *rtmp, struct rtmp_packet *pkt, srv_ctx *ctx);
 
 #endif //VIDEOAPI_MEDIASERVER_H
