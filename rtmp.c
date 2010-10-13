@@ -509,7 +509,7 @@ static int handle_msg(rtmp *r, struct rtmp_packet *pkt, ev_io *io)
 {
     switch (pkt->msg_type) {
     case 0x01: // set chunk size
-        r->out_chunk_size = amf_read_i32(pkt->body);
+        r->in_chunk_size = amf_read_i32(pkt->body);
         break;
     case 0x02: // abort message
         break;
