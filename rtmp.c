@@ -544,6 +544,11 @@ static int handle_msg(rtmp *r, struct rtmp_packet *pkt, ev_io *io)
     return 0;
 }
 
+static uint32_t read_i32_le(uint8_t *c)
+{
+    return (c[3] << 24) | (c[2] << 16) | (c[1] << 8) | c[0];
+}
+
 static int process_packet(ev_io *io)
 {
     rtmp *r = get_rtmp(io);
@@ -599,7 +604,7 @@ static int process_packet(ev_io *io)
     switch (header_type) {
     case CHUNK_LARGE:
         if ((pe - p) < CHUNK_SIZE_LARGE) goto parse_pkt_fail;
-        pkt->msg_id = amf_read_i32(&p[7]);
+        pkt->msg_id = read_i32_le(&p[7]);
         to_increment += 4;
     case CHUNK_MEDIUM:
         if ((pe - p) < CHUNK_SIZE_MEDIUM ) goto parse_pkt_fail;
