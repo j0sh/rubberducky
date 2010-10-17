@@ -22,7 +22,7 @@
 
 #define BACKLOG           20
 
-#define HOSTNAME "moneypenny"
+#define HOSTNAME "localhost"
 #define RTMP_PORT_STRING  QUOTEVALUE(RTMP_PORT)
 
 static int resolve_host(struct sockaddr_in *addr,
@@ -63,7 +63,7 @@ static int setup_socket(const char *hostname, int port)
         goto fail;
     }
 
-    addr.sin_port = htons(RTMP_PORT);
+    addr.sin_port = htons(port);
     setsockopt(sockfd, SOL_SOCKET, SO_REUSEADDR, &tmp, sizeof(tmp));
 
     if (resolve_host(&addr, HOSTNAME, QUOTEVALUE(RTMP_PORT))) {
