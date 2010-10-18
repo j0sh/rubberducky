@@ -466,7 +466,7 @@ static int handle_control(rtmp *r, rtmp_packet *pkt)
         body += 4;
         break;
     case PING:
-        send_pong(r, amf_read_i32(body), pkt->timestamp + 1);
+        send_pong(r, amf_read_i32(body), pkt->ts_delta + 1);
         body += 4;
         break;
     case SET_BUF_LEN:
@@ -497,7 +497,7 @@ static int handle_setpeerbw(rtmp *r, rtmp_packet *pkt)
     ack = amf_read_i32(pkt->body);
     if (ack != r->ack_size) {
         r->ack_size = ack;
-        return send_ack_size(r, pkt->timestamp + 1);
+        return send_ack_size(r, pkt->ts_delta + 1);
     }
 
     return 0;
@@ -628,10 +628,13 @@ static int process_packet(ev_io *io)
             ts = amf_read_i32(p+hsize);
             to_increment += 4;
         }
-        if (!header_type)
+        if (!header_type) {
             pkt->timestamp = ts; // abs timestamp
-        else
+            pkt->ts_delta = 0;
+        } else {
             pkt->timestamp += ts; // timestamp delta
+            pkt->ts_delta = ts;
+        }
     }
     case 3:
         break;
