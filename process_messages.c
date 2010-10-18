@@ -9,6 +9,7 @@
 #include <string.h>
 #include <stdlib.h>
 #include <time.h>
+#include <arpa/inet.h> // for htonl
 
 #include <librtmp/amf.h>
 
@@ -458,6 +459,20 @@ void rtmp_invoke(rtmp *rtmp, rtmp_packet *pkt, srv_ctx *ctx)
         send_onstatus(rtmp, val.av_val, publish);
         fprintf(stdout, "publishing %s (id %d)\n",
                 stream->name, stream->id);
+        rtmp->file = fopen(stream->name, "w+b");
+        if (0 == rtmp->file) {
+            fprintf(stderr, "Failed to open file %s\n", stream->name);
+            return;
+        }
+        {
+        int flv01 = MKTAG('F','L','V',0x01);
+        char av = 5; //has audio, has video (binary 0b101)
+        int len = htonl(9), zero = 0;
+        fwrite(&flv01, 4, 1, rtmp->file);
+        fwrite(&av, 1, 1, rtmp->file);
+        fwrite(&len, 4, 1, rtmp->file);
+        fwrite(&zero, 4, 1, rtmp->file); // previous tag size
+        }
     } else if(AVMATCH(&method, &av_deleteStream))
     {
         int stream_id;

@@ -1,6 +1,7 @@
 #ifndef VIDEOAPI_RTMP_H
 #define VIDEOAPI_RTMP_H
 
+#include <stdio.h>
 #include <stdint.h>
 #include <ev.h>
 
@@ -98,6 +99,8 @@ typedef struct rtmp {
     char *url; // protocol, hostname and application name
     ev_io read_watcher;
     void (*read_cb)(struct rtmp *r, rtmp_packet *pkt, void *opaque);
+
+    FILE *file;
 }rtmp;
 
 void rtmp_init(rtmp *r);

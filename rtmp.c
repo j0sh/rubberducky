@@ -507,6 +507,41 @@ peerbw_fail:
     return -1;
 }
 
+static void handle_media(rtmp *r, rtmp_packet *pkt)
+{
+    uint32_t size = pkt->size;
+    uint32_t ts = htonl(pkt->timestamp) >> 8;
+    uint8_t ts2 = ts & 0xff;
+    uint8_t zero[4] = { 0 };
+    uint8_t *data = pkt->body;
+
+    if (0x12 == pkt->msg_type &&
+        !memcmp("\x02\x00\x0d@setDataFrame", data, 16)) {
+        // TODO store metadata in stream context
+        data += 16;
+        size -= 16;
+    }
+
+// packet write
+#define pw(data, size, num) fwrite(data, size, num, r->file)
+
+    // write flv headers. see adobe flash video file format spec
+    pw(&pkt->msg_type, 1, 1); // if encrypted, set the 3rd-high bit to 1
+    size = htonl(size) >> 8; // shift to avoid truncation
+    pw(&size, 3, 1);
+    size = ntohl(size << 8);
+    pw(&ts, 3, 1);
+    pw(&ts2, 1, 1);
+    pw(&zero, 3, 1);
+    pw(data, 1, size);
+    size = size + 11;
+    size = htonl(size) >> 8;
+    pw(&size, 4, 1);
+    size = ntohl(size << 8);
+
+#undef pw
+}
+
 static int handle_msg(rtmp *r, struct rtmp_packet *pkt, ev_io *io)
 {
     switch (pkt->msg_type) {
@@ -531,6 +566,8 @@ static int handle_msg(rtmp *r, struct rtmp_packet *pkt, ev_io *io)
         break;
     case 0x08:
     case 0x09:
+    case 0x12:
+        handle_media(r, pkt);
         break; // audio and video
     case 0x11: // Flex message
     case 0x14:
