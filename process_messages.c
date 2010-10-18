@@ -393,28 +393,20 @@ void rtmp_invoke(rtmp *rtmp, rtmp_packet *pkt, srv_ctx *ctx)
         send_cxn_resp(rtmp, txn);
     } else if(AVMATCH(&method, &av_releaseStream))
     {
-        send_result(rtmp, txn, 6);
+        send_result(rtmp, txn, pkt->msg_id);
     } else if(AVMATCH(&method, &av_FCPublish))
     {
-        send_result(rtmp, txn, 6);
+        send_result(rtmp, txn, pkt->msg_id);
         AMFProp_GetString(AMF_GetProp(&obj, NULL, 3), &val);
         send_fcpublish(rtmp, val.av_val, txn, publish);
     } else if(AVMATCH(&method, &av_FCUnpublish))
     {
-        send_result(rtmp, txn, 0);
+        send_result(rtmp, txn, pkt->msg_id);
         AMFProp_GetString(AMF_GetProp(&obj, NULL, 3), &val);
         send_fcpublish(rtmp, val.av_val, txn, unpublish);
     } else if(AVMATCH(&method, &av_createStream))
     {
-        send_result(rtmp, txn, 0);
-    } else if(AVMATCH(&method, &av_publish))
-    {
         int i;
-        AVal type;
-        // transaction id (index 1) is always zero here,
-        // command object (index 2) is always null here.
-        AMFProp_GetString(AMF_GetProp(&obj, NULL, 3), &val);
-        AMFProp_GetString(AMF_GetProp(&obj, NULL, 4), &type); //XXX live/recod/append
         for (i = 0; i < RTMP_MAX_STREAMS; i++) {
             if (!rtmp->streams[i]) {
                 rtmp_stream *stream = malloc(sizeof(rtmp_stream));
@@ -422,6 +414,28 @@ void rtmp_invoke(rtmp *rtmp, rtmp_packet *pkt, srv_ctx *ctx)
                     fprintf(stderr, "Out of memory for stream!\n");
                     return;
                 }
+                stream->id = i;
+                rtmp->streams[i] = stream;
+                break;
+            }
+        }
+        if (i != RTMP_MAX_STREAMS)
+            send_result(rtmp, txn, rtmp->streams[i]->id);
+        else
+            fprintf(stderr, "Maximum number of streams exceeded!\n");
+    } else if(AVMATCH(&method, &av_publish))
+    {
+        AVal type;
+        rtmp_stream *stream;
+        // transaction id (index 1) is always zero here,
+        // command object (index 2) is always null here.
+        AMFProp_GetString(AMF_GetProp(&obj, NULL, 3), &val);
+        AMFProp_GetString(AMF_GetProp(&obj, NULL, 4), &type); //XXX live/recod/append
+        stream = rtmp->streams[pkt->msg_id];
+        if (!stream) {
+            fprintf(stderr, "Unable to publish; stream ID invalid.\n");
+            return;
+        }
                 stream->name = malloc(val.av_len + 1);
                 if (!stream->name) { // TODO something drastic
                     free(stream);
@@ -430,7 +444,6 @@ void rtmp_invoke(rtmp *rtmp, rtmp_packet *pkt, srv_ctx *ctx)
                 }
                 strncpy(stream->name, val.av_val, val.av_len);
                 stream->name[val.av_len] = '\0';
-                stream->id = pkt->msg_id;
 
                 // use strncmp variant because the type is not likely to
                 // be null-terminated, so avoid a 1-byte overread. Note
@@ -442,28 +455,21 @@ void rtmp_invoke(rtmp *rtmp, rtmp_packet *pkt, srv_ctx *ctx)
                 } else if (!strncmp(type.av_val, "append", 6)) {
                     stream->type = APPEND;
                 }
-                rtmp->streams[i] = stream;
-                break;
-            }
-        }
         send_onstatus(rtmp, val.av_val, publish);
         fprintf(stdout, "publishing %s (id %d)\n",
-                rtmp->streams[i]->name, rtmp->streams[i]->id);
+                stream->name, stream->id);
     } else if(AVMATCH(&method, &av_deleteStream))
     {
-        int i, stream_id;
+        int stream_id;
         stream_id = (int)AMFProp_GetNumber(AMF_GetProp(&obj, NULL, 3));
-        for (i = 0; i < RTMP_MAX_STREAMS; i++) {
-            if (rtmp->streams[i]) {
-                if (rtmp->streams[i]->id == stream_id) {
-                    fprintf(stderr, "deleting %s (%d)\n",
-                            rtmp->streams[i]->name, stream_id);
-                    // TODO only for published streams
-                    send_onstatus(rtmp, rtmp->streams[i]->name, unpublish);
-                    rtmp_free_stream(&rtmp->streams[i]);
-                }
-            }
+        if (!rtmp->streams[stream_id]) {
+            fprintf(stderr, "Unable to delete stream; invalid id %d\n", stream_id);
+            return;
         }
+        // TODO only for published streams
+        send_onstatus(rtmp, rtmp->streams[stream_id]->name, unpublish);
+        rtmp_free_stream(&rtmp->streams[stream_id]);
+        fprintf(stderr, "Deleting stream %d\n", stream_id);
     } else if(AVMATCH(&method, &av_play))
     {
         AMFProp_GetString(AMF_GetProp(&obj, NULL, 3), &val);
