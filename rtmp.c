@@ -172,7 +172,7 @@ static uint32_t get_uptime()
 
 static inline rtmp* get_rtmp(ev_io *w)
 {
-    return (rtmp*)((uint8_t*)w - offsetof(rtmp, read_watcher));
+    return (rtmp*)w->data;
 }
 
 static int send_ack(rtmp *r, int ts)
@@ -743,7 +743,6 @@ parse_pkt_fail:
 void rtmp_read(struct ev_loop *loop, ev_io *io, int revents)
 {
     rtmp *r = get_rtmp(io);
-    srv_ctx *ctx = io->data;
     int bytes_read;
 
     switch (r->state) {
@@ -767,6 +766,6 @@ read_error:
     if (bytes_read == RTMPERR(INVALIDDATA))
         fprintf(stderr, "Invalid data\n");
     fprintf(stderr, "Error %d, disconnecting fd %d \n", bytes_read, r->fd);
-    ev_io_stop(ctx->loop, io);
-    close(r->fd);
+    if (r->close_cb)
+        r->close_cb(r);
 }

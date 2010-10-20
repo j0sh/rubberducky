@@ -1,6 +1,7 @@
 /* system includes */
 #include <stdio.h>
 #include <errno.h>
+#include <stddef.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -90,8 +91,9 @@ fail:
     return -errno;
 }
 
-static void free_client(srv_ctx *ctx, client_ctx *client)
+static void free_client(client_ctx *client)
 {
+    srv_ctx *ctx = client->srv;
     client_ctx *c = ctx->clients, *p = NULL;
     while (c != client) { //TODO get rid of the list
         p = c;
@@ -104,6 +106,7 @@ static void free_client(srv_ctx *ctx, client_ctx *client)
 
     fprintf(stdout, "(%d) Disconnecting\n", c->id);
     rtmp_free(&c->rtmp);
+    ev_io_stop(ctx->loop, &c->read_watcher);
     free(c);
     ctx->connections--;
 }
@@ -116,7 +119,7 @@ static void free_all(srv_ctx *ctx)
     while (c) {
         client_ctx *d = c;
         c = c->next;
-        free_client(ctx, d);
+        free_client(d);
     }
     ctx->clients = NULL;
 
@@ -133,8 +136,9 @@ static void close_cb(struct ev_loop *loop, ev_signal *signal, int revents)
     free_all((srv_ctx*)signal->data);
 }
 
-static void read_cb(rtmp *r, rtmp_packet *pkt, void *opaque)
+static void rd_rtmp_close_cb(rtmp *r)
 {
+    free_client((client_ctx*)((uint8_t*)r - offsetof(client_ctx, rtmp)));
 }
 
 static void incoming_cb(struct ev_loop *loop, ev_io *io, int revents)
@@ -161,18 +165,19 @@ static void incoming_cb(struct ev_loop *loop, ev_io *io, int revents)
     client->next = ctx->clients;
     ctx->clients = client;
     ctx->connections++;
+    client->srv = ctx;
     client->id = ctx->total_cxns++;
 
     rtmp_init(&client->rtmp);
     client->rtmp.fd = clientfd;
-    client->rtmp.read_watcher.data = ctx;
-    client->rtmp.read_cb = read_cb;
+    client->read_watcher.data = &client->rtmp;
+    client->rtmp.close_cb = rd_rtmp_close_cb;
 
     fcntl(clientfd, F_SETFL, O_NONBLOCK);
 
     /* setup the events */
-    ev_io_init(&client->rtmp.read_watcher, rtmp_read, client->rtmp.fd, EV_READ);
-    ev_io_start(ctx->loop, &client->rtmp.read_watcher);
+    ev_io_init(&client->read_watcher, rtmp_read, client->rtmp.fd, EV_READ);
+    ev_io_start(ctx->loop, &client->read_watcher);
 
     // we can convert this to a readable hostname later
     // during some postprocessing/analytics stage.
@@ -184,7 +189,7 @@ fail:
     fprintf(stderr, "%s", errstr);
     if (clientfd) close(clientfd);
     if (ctx->clients == client)
-        free_client(ctx, client);
+        free_client(client);
 }
 
 static ev_signal signal_watcher_int;
