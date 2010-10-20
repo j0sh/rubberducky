@@ -98,6 +98,7 @@ typedef struct rtmp {
     char *url; // protocol, hostname and application name
     void (*read_cb)(struct rtmp *r, rtmp_packet *pkt, void *opaque);
     void (*close_cb)(struct rtmp *r);
+    void (*publish_cb)(struct rtmp *r, rtmp_stream *s);
 }rtmp;
 
 void rtmp_init(rtmp *r);

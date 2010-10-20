@@ -16,11 +16,18 @@
 #define QUOTELITERAL(x) #x
 #define QUOTEVALUE(x) QUOTELITERAL(x)
 
+typedef struct {
+    rtmp **list;
+    int nb_recvs;
+    int max_recvs;
+}recv_ctx;
+
 struct srv_ctx;
 
 typedef struct client_ctx {
     int id;
     rtmp rtmp;
+    recv_ctx *recvs;
     ev_io read_watcher;
     struct srv_ctx *srv;
     struct client_ctx *next;

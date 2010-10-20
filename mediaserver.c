@@ -106,6 +106,7 @@ static void free_client(client_ctx *client)
 
     fprintf(stdout, "(%d) Disconnecting\n", c->id);
     rtmp_free(&c->rtmp);
+    if (c->recvs) free(c->recvs);
     ev_io_stop(ctx->loop, &c->read_watcher);
     free(c);
     ctx->connections--;
@@ -141,6 +142,24 @@ static void rd_rtmp_close_cb(rtmp *r)
     free_client((client_ctx*)((uint8_t*)r - offsetof(client_ctx, rtmp)));
 }
 
+static void rd_rtmp_publish_cb(rtmp *r, rtmp_stream *stream)
+{
+#define MAX_CLIENTS 10
+    client_ctx *client;
+    recv_ctx *recvs;
+
+    client = (client_ctx*)((uint8_t*)r - offsetof(client_ctx, rtmp));
+    recvs = malloc(MAX_CLIENTS * sizeof(rtmp*) + sizeof(recv_ctx));
+    if (!recvs) {
+        fprintf(stderr, "Out of memory when mallocing receivers!\n");
+        return; // TODO something drastic
+    }
+    memset(recvs, 0, MAX_CLIENTS * sizeof(rtmp*) + sizeof(recv_ctx));
+    recvs->max_recvs = MAX_CLIENTS;
+    client->recvs = recvs;
+#undef MAX_CLIENTS
+}
+
 static void incoming_cb(struct ev_loop *loop, ev_io *io, int revents)
 {
     int clientfd;
@@ -172,6 +191,7 @@ static void incoming_cb(struct ev_loop *loop, ev_io *io, int revents)
     client->rtmp.fd = clientfd;
     client->read_watcher.data = &client->rtmp;
     client->rtmp.close_cb = rd_rtmp_close_cb;
+    client->rtmp.publish_cb = rd_rtmp_publish_cb;
 
     fcntl(clientfd, F_SETFL, O_NONBLOCK);
 

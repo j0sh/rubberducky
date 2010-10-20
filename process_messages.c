@@ -455,6 +455,8 @@ void rtmp_invoke(rtmp *rtmp, rtmp_packet *pkt, srv_ctx *ctx)
                 } else if (!strncmp(type.av_val, "append", 6)) {
                     stream->type = APPEND;
                 }
+        if (rtmp->publish_cb)
+            rtmp->publish_cb(rtmp, stream);
         send_onstatus(rtmp, val.av_val, publish);
         fprintf(stdout, "publishing %s (id %d)\n",
                 stream->name, stream->id);
