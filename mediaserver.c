@@ -112,12 +112,11 @@ static void free_all(srv_ctx *ctx)
 {
     client_ctx *c = ctx->clients;
 
-    //TODO refactor into free_client. better yet, get rid of the list.
+    //TODO Get rid of the list? Options?
     while (c) {
         client_ctx *d = c;
         c = c->next;
-        rtmp_free(&d->rtmp);
-        free(d);
+        free_client(ctx, d);
     }
     ctx->clients = NULL;
 
