@@ -1,4 +1,4 @@
-The videoapi mediaserver. We need a better name for it.
+Rubberducky: the videoapi mediaserver.
 
 Requires libev, librtmp, and openssl.
 
