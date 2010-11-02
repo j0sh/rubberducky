@@ -96,7 +96,7 @@ typedef struct rtmp {
     rtmp_stream *streams[RTMP_MAX_STREAMS];
     char *app; // application name string
     char *url; // protocol, hostname and application name
-    void (*read_cb)(struct rtmp *r, rtmp_packet *pkt, void *opaque);
+    void (*read_cb)(struct rtmp *r, rtmp_packet *pkt);
     void (*close_cb)(struct rtmp *r);
     void (*publish_cb)(struct rtmp *r, rtmp_stream *s);
     void (*delete_cb)(struct rtmp *r, rtmp_stream *s);

@@ -279,7 +279,7 @@ static int handle_msg(rtmp *r, struct rtmp_packet *pkt, ev_io *io)
         fprintf(stdout, "default in cb: 0x%x\n", pkt->msg_type);
     }
     if (r->read_cb)
-        r->read_cb(r, pkt, io->data);
+        r->read_cb(r, pkt);
     return 0;
 }
 
