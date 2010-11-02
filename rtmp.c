@@ -89,6 +89,32 @@ static int send_pong(rtmp *r, uint32_t ping_t, int ts)
     return rtmp_send(r, &packet);
 }
 
+static videoapi_unused int send_buflen(rtmp *r, int stream_id, int ts)
+{
+#define BUFLEN 3000
+    uint8_t pbuf[RTMP_MAX_HEADER_SIZE + 10] = {0},
+    *body = pbuf + RTMP_MAX_HEADER_SIZE, *end = pbuf + sizeof(pbuf);
+    rtmp_packet packet = {
+        .chunk_id  = 0x02,
+        .msg_id    = 0,
+        .msg_type  = 0x04,
+        .timestamp = ts,
+        .size      = end - body,
+        .body      = body
+    };
+
+    amf_write_i16(body, end, 0x07);
+    body += 2;
+    amf_write_i32(body, end, stream_id);
+    body += 4;
+    amf_write_i32(body, end, BUFLEN);
+
+    fprintf(stdout, "Sending buflen for stream %d, %d-ms buffer\n",
+            stream_id, BUFLEN);
+    return rtmp_send(r, &packet);
+#undef BUFLEN
+}
+
 static int send_ack_size(rtmp *r, int ts)
 {
     uint8_t pbuf[RTMP_MAX_HEADER_SIZE + 4] = { 0 };
