@@ -50,6 +50,23 @@ static int send_ack(rtmp *r, int ts)
     return rtmp_send(r, &packet);
 }
 
+static int send_ping(rtmp *rtmp, int ts)
+{
+    uint32_t now = get_uptime();
+    uint8_t pbuf[RTMP_MAX_HEADER_SIZE+4];
+    amf_write_i32(pbuf + RTMP_MAX_HEADER_SIZE, pbuf + sizeof(pbuf), now);
+    memset(pbuf, 0, RTMP_MAX_HEADER_SIZE);
+    rtmp_packet packet = {
+        .chunk_id = 0x02,
+        .msg_id = 0,
+        .msg_type = 0x04,
+        .timestamp = ts,
+        .size = sizeof(pbuf) - RTMP_MAX_HEADER_SIZE,
+        .body = pbuf + RTMP_MAX_HEADER_SIZE
+    };
+    return rtmp_send(rtmp, &packet);
+}
+
 static int send_pong(rtmp *r, uint32_t ping_t, int ts)
 {
     uint8_t pbuf[RTMP_MAX_HEADER_SIZE + 6],
@@ -90,6 +107,23 @@ static int send_ack_size(rtmp *r, int ts)
     return rtmp_send(r, &packet);
 }
 
+static int send_peer_bw(rtmp *rtmp, int ts)
+{
+    uint8_t pbuf[RTMP_MAX_HEADER_SIZE+5] = {0};
+    amf_write_i32(pbuf + RTMP_MAX_HEADER_SIZE, pbuf + RTMP_MAX_HEADER_SIZE + 4, 0x0fffffff);
+    pbuf[RTMP_MAX_HEADER_SIZE + 4] = 2;
+    rtmp_packet packet = {
+        .chunk_id = 0x02,
+        .msg_id = 0,
+        .msg_type = 0x06,
+        .timestamp = 0,
+        .size = sizeof(pbuf) - RTMP_MAX_HEADER_SIZE,
+        .body = pbuf + RTMP_MAX_HEADER_SIZE
+    };
+    fprintf(stdout, "sending clientbw, rx: %d, tx %d\n", rtmp->rx, rtmp->tx);
+    return rtmp_send(rtmp, &packet);
+}
+
 static int read_bytes(rtmp *r, uint8_t *p, int howmany)
 {
     int len;
@@ -111,6 +145,7 @@ static int read_bytes(rtmp *r, uint8_t *p, int howmany)
 }
 
 #include "handshake.c"
+#include "process_messages.c"
 
 enum {
     STREAM_BEGIN,
@@ -212,7 +247,7 @@ static int handle_msg(rtmp *r, struct rtmp_packet *pkt, ev_io *io)
         break; // audio and video
     case 0x11: // Flex message
     case 0x14:
-        rtmp_invoke(r, pkt, io->data);
+        handle_invoke(r, pkt);
         break;
     default:
         fprintf(stdout, "default in cb: 0x%x\n", pkt->msg_type);

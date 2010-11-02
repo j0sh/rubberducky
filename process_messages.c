@@ -1,9 +1,8 @@
-/* Bindings for the librtmp library.
- */
+#ifndef _RTMP_HANDLE_INVOKE_C_
+#define _RTMP_HANDLE_INVOKE_C_
 
-/**
- * TODO take packet init off the stack and use a slab-type allocator
- */
+// functions to handle 0x14 messages stuff
+// in a separate file because they're ugly
 
 #include <stdio.h>
 #include <string.h>
@@ -38,57 +37,7 @@ SAVC(play);
 
 #define STR2AVAL(av,str)	av.av_val = str; av.av_len = strlen(av.av_val)
 
-static int set_peer_bw(rtmp *rtmp)
-{
-    uint8_t pbuf[RTMP_MAX_HEADER_SIZE+5] = {0};
-    amf_write_i32(pbuf + RTMP_MAX_HEADER_SIZE, pbuf + RTMP_MAX_HEADER_SIZE + 4, 0x0fffffff);
-    pbuf[RTMP_MAX_HEADER_SIZE + 4] = 2;
-    rtmp_packet packet = {
-        .chunk_id = 0x02,
-        .msg_id = 0,
-        .msg_type = 0x06,
-        .timestamp = 0,
-        .size = sizeof(pbuf) - RTMP_MAX_HEADER_SIZE,
-        .body = pbuf + RTMP_MAX_HEADER_SIZE
-    };
-    fprintf(stdout, "sending clientbw, rx: %d, tx %d\n", rtmp->rx, rtmp->tx);
-    return rtmp_send(rtmp, &packet);
-}
-
-static int window_ack_size(rtmp *rtmp)
-{
-    uint8_t pbuf[RTMP_MAX_HEADER_SIZE + 4] = { 0 };
-    amf_write_i32(pbuf + RTMP_MAX_HEADER_SIZE, pbuf + RTMP_MAX_HEADER_SIZE + 4, 0x0fffffff);
-    rtmp_packet packet = {
-        .chunk_id = 0x02,
-        .msg_id = 0,
-        .msg_type = 0x05,
-        .timestamp = 0,
-        .size = sizeof(pbuf) - RTMP_MAX_HEADER_SIZE,
-        .body = pbuf + RTMP_MAX_HEADER_SIZE
-    };
-    return rtmp_send(rtmp, &packet);
-}
-
-static int send_ping(rtmp *rtmp)
-{
-    time_t now = time(NULL);
-    uint8_t pbuf[RTMP_MAX_HEADER_SIZE+4];
-    amf_write_i32(pbuf + RTMP_MAX_HEADER_SIZE, pbuf + sizeof(pbuf), now);
-    memset(pbuf, 0, RTMP_MAX_HEADER_SIZE);
-    rtmp_packet packet = {
-        .chunk_id = 0x02,
-        .msg_id = 0,
-        .msg_type = 0x04,
-        .timestamp = 0,
-        .size = sizeof(pbuf) - RTMP_MAX_HEADER_SIZE,
-        .body = pbuf + RTMP_MAX_HEADER_SIZE
-    };
-    return rtmp_send(rtmp, &packet);
-}
-
-//XXX figure out just WTF the stream id is used for
-static int send_result(rtmp *rtmp, double txn, double stream_id)
+static int send_result(rtmp *rtmp, double txn, double stream_id, int ts)
 {
     uint8_t pbuf[128], *end = pbuf+sizeof(pbuf), *enc = pbuf+RTMP_MAX_HEADER_SIZE, *foo;
     memset(pbuf, 0, RTMP_MAX_HEADER_SIZE);
@@ -101,14 +50,14 @@ static int send_result(rtmp *rtmp, double txn, double stream_id)
         .chunk_id = 0x03,
         .msg_type = 0x14,
         .msg_id = 0,
-        .timestamp = 0,
+        .timestamp = ts,
         .size = enc - foo,
         .body = foo
     };
     return rtmp_send(rtmp, &packet);
 }
 
-static int send_onbw_done(rtmp *rtmp)
+static int send_onbw_done(rtmp *rtmp, int ts)
 {
     // i have never actually seen a flash client make use of this.
     uint8_t pbuf[128], *end = pbuf+sizeof(pbuf), *enc = pbuf+RTMP_MAX_HEADER_SIZE, *foo;
@@ -121,14 +70,14 @@ static int send_onbw_done(rtmp *rtmp)
         .chunk_id = 0x03,
         .msg_type = 0x14,
         .msg_id = 0,
-        .timestamp = 0,
+        .timestamp = ts,
         .size = enc - foo,
         .body = foo
     };
     return rtmp_send(rtmp, &packet);
 }
 
-static int send_cxn_resp(rtmp *rtmp, double txn)
+static int send_cxn_resp(rtmp *rtmp, double txn, int ts)
 {
     rtmp_packet packet;
   uint8_t pbuf[384], *pend = pbuf+sizeof(pbuf), *enc;
@@ -140,7 +89,7 @@ static int send_cxn_resp(rtmp *rtmp, double txn)
     packet.chunk_type = CHUNK_MEDIUM;
     packet.msg_type = 0x14;
     packet.msg_id = 0;
-    packet.timestamp = 0;
+    packet.timestamp = ts;
     packet.body = pbuf + RTMP_MAX_HEADER_SIZE;
 
     memset(pbuf, 0, RTMP_MAX_HEADER_SIZE);
@@ -183,7 +132,7 @@ static int send_cxn_resp(rtmp *rtmp, double txn)
 
 typedef enum {publish = 0, unpublish, play} stream_cmd;
 static int send_fcpublish(rtmp *rtmp, const char *streamname,
-                          double txn, stream_cmd action)
+                          double txn, stream_cmd action, int ts)
 {
     uint8_t pbuf[256], *end = pbuf+sizeof(pbuf), *enc = pbuf+RTMP_MAX_HEADER_SIZE, *foo;
     memset(pbuf, 0, RTMP_MAX_HEADER_SIZE);
@@ -217,7 +166,7 @@ static int send_fcpublish(rtmp *rtmp, const char *streamname,
         .chunk_id = 0x03,
         .msg_type = 0x14,
         .msg_id = 0,
-        .timestamp = 0,
+        .timestamp = ts,
         .size = enc - foo,
         .body = foo
     };
@@ -225,7 +174,8 @@ static int send_fcpublish(rtmp *rtmp, const char *streamname,
     return rtmp_send(rtmp, &packet);
 }
 
-static int send_onstatus(rtmp *rtmp, char *streamname, stream_cmd action)
+static int send_onstatus(rtmp *rtmp, char *streamname,
+                         stream_cmd action, int ts)
 {
     uint8_t pbuf[256], *end = pbuf+sizeof(pbuf), *enc = pbuf+RTMP_MAX_HEADER_SIZE, *foo;
     char tbuf[64], pubstr[64]; //XXX this might not be enough later on
@@ -269,7 +219,7 @@ static int send_onstatus(rtmp *rtmp, char *streamname, stream_cmd action)
         .chunk_id = 0x04,
         .msg_type = 0x14,
         .msg_id = 0,
-        .timestamp = 0,
+        .timestamp = ts,
         .size = enc - foo,
         .body = foo
     };
@@ -354,7 +304,7 @@ static void handle_connect(rtmp *rtmp, rtmp_packet *pkt, AMFObject *obj)
         }
 }
 
-void rtmp_invoke(rtmp *rtmp, rtmp_packet *pkt, srv_ctx *ctx)
+static void handle_invoke(rtmp *rtmp, rtmp_packet *pkt)
 {
     uint8_t *body = pkt->body;
     int pkt_len = pkt->size;
@@ -385,25 +335,25 @@ void rtmp_invoke(rtmp *rtmp, rtmp_packet *pkt, srv_ctx *ctx)
 
     if(AVMATCH(&method, &av_connect))
     {
-        window_ack_size(rtmp);
-        set_peer_bw(rtmp);
-        send_ping(rtmp);
-        send_onbw_done(rtmp);
+        send_ack_size(rtmp, pkt->ts_delta + 1);
+        send_peer_bw(rtmp, pkt->ts_delta + 2);
+        send_ping(rtmp, pkt->ts_delta + 3);
+        send_onbw_done(rtmp, pkt->ts_delta + 4);
         handle_connect(rtmp, pkt, &obj);
-        send_cxn_resp(rtmp, txn);
+        send_cxn_resp(rtmp, txn, pkt->ts_delta + 5);
     } else if(AVMATCH(&method, &av_releaseStream))
     {
-        send_result(rtmp, txn, pkt->msg_id);
+        send_result(rtmp, txn, pkt->msg_id, pkt->ts_delta + 1);
     } else if(AVMATCH(&method, &av_FCPublish))
     {
-        send_result(rtmp, txn, pkt->msg_id);
+        send_result(rtmp, txn, pkt->msg_id, pkt->ts_delta + 1);
         AMFProp_GetString(AMF_GetProp(&obj, NULL, 3), &val);
-        send_fcpublish(rtmp, val.av_val, txn, publish);
+        send_fcpublish(rtmp, val.av_val, txn, publish, pkt->ts_delta + 2);
     } else if(AVMATCH(&method, &av_FCUnpublish))
     {
-        send_result(rtmp, txn, pkt->msg_id);
+        send_result(rtmp, txn, pkt->msg_id, pkt->ts_delta + 1);
         AMFProp_GetString(AMF_GetProp(&obj, NULL, 3), &val);
-        send_fcpublish(rtmp, val.av_val, txn, unpublish);
+        send_fcpublish(rtmp, val.av_val, txn, unpublish, pkt->ts_delta + 2);
     } else if(AVMATCH(&method, &av_createStream))
     {
         int i;
@@ -420,7 +370,7 @@ void rtmp_invoke(rtmp *rtmp, rtmp_packet *pkt, srv_ctx *ctx)
             }
         }
         if (i != RTMP_MAX_STREAMS)
-            send_result(rtmp, txn, rtmp->streams[i]->id);
+            send_result(rtmp, txn, rtmp->streams[i]->id, pkt->ts_delta + 1);
         else
             fprintf(stderr, "Maximum number of streams exceeded!\n");
     } else if(AVMATCH(&method, &av_publish))
@@ -457,7 +407,7 @@ void rtmp_invoke(rtmp *rtmp, rtmp_packet *pkt, srv_ctx *ctx)
                 }
         if (rtmp->publish_cb)
             rtmp->publish_cb(rtmp, stream);
-        send_onstatus(rtmp, val.av_val, publish);
+        send_onstatus(rtmp, val.av_val, publish, pkt->ts_delta + 1);
         fprintf(stdout, "publishing %s (id %d)\n",
                 stream->name, stream->id);
     } else if(AVMATCH(&method, &av_deleteStream))
@@ -469,13 +419,13 @@ void rtmp_invoke(rtmp *rtmp, rtmp_packet *pkt, srv_ctx *ctx)
             return;
         }
         // TODO only for published streams
-        send_onstatus(rtmp, rtmp->streams[stream_id]->name, unpublish);
+        send_onstatus(rtmp, rtmp->streams[stream_id]->name, unpublish, pkt->ts_delta + 1);
         rtmp_free_stream(&rtmp->streams[stream_id]);
         fprintf(stderr, "Deleting stream %d\n", stream_id);
     } else if(AVMATCH(&method, &av_play))
     {
         AMFProp_GetString(AMF_GetProp(&obj, NULL, 3), &val);
-        send_onstatus(rtmp, val.av_val, play);
+        send_onstatus(rtmp, val.av_val, play, pkt->ts_delta + 1);
         //ctx->stream.fds[ctx->stream.cxn_count++] = rtmp;
     }
     AMF_Reset(&obj);
@@ -486,3 +436,5 @@ invoke_error:
     fprintf(stderr, "%s\n", errstr);
 
 }
+
+#endif
