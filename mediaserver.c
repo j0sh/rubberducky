@@ -108,6 +108,7 @@ static void free_client(client_ctx *client)
     fprintf(stdout, "(%d) Disconnecting\n", c->id);
 
     // free streams in the server tree
+    // XXX this only works for publishers; fix for listeners.
     for (i = 0; i < RTMP_MAX_STREAMS; i++)
         if (c->rtmp.streams[i] && c->rtmp.streams[i]->name) {
             printf("Deleting stream %s\n", c->rtmp.streams[i]->name);
@@ -174,10 +175,43 @@ static void rd_rtmp_publish_cb(rtmp *r, rtmp_stream *stream)
     }
     memset(recvs, 0, MAX_CLIENTS * sizeof(rtmp*) + sizeof(recv_ctx));
     recvs->max_recvs = MAX_CLIENTS;
+    recvs->list = (rtmp**)(recvs + 1);
     client->recvs = recvs;
 
     rxt_put(stream->name, client, srv->streams);
 #undef MAX_CLIENTS
+}
+
+static void rd_rtmp_play_cb(rtmp *r, char *stream_name)
+{
+    client_ctx *listener = get_client(r);
+    srv_ctx *srv = listener->srv;
+    client_ctx *client = rxt_get(stream_name, srv->streams);
+    recv_ctx *recvs;
+    const char *errstr;
+    int i;
+    if (!client) {
+        errstr = "Couldn not find client!\n";
+        goto play_fail;
+    }
+    recvs = client->recvs;
+    if (!recvs) {
+        errstr = "Could not find recvs!\n";
+        goto play_fail;
+    }
+    for (i = 0; i < recvs->max_recvs; i++)
+        if (!recvs->list[i]) {
+            recvs->list[i] = r;
+            recvs->nb_recvs++;
+            break;
+        }
+
+    if (i < recvs->max_recvs) return;
+    errstr = "Receiver list full!\n";
+
+play_fail:
+    fprintf(stderr, "Error processing play request: %s\n", errstr);
+    return;
 }
 
 static void rd_rtmp_delete_cb(rtmp *r, rtmp_stream *s)
@@ -222,6 +256,7 @@ static void incoming_cb(struct ev_loop *loop, ev_io *io, int revents)
     client->rtmp.close_cb = rd_rtmp_close_cb;
     client->rtmp.publish_cb = rd_rtmp_publish_cb;
     client->rtmp.delete_cb = rd_rtmp_delete_cb;
+    client->rtmp.play_cb = rd_rtmp_play_cb;
 
     fcntl(clientfd, F_SETFL, O_NONBLOCK);
 

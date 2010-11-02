@@ -430,6 +430,7 @@ static void handle_invoke(rtmp *rtmp, rtmp_packet *pkt)
         AMFProp_GetString(AMF_GetProp(&obj, NULL, 3), &val);
         send_onstatus(rtmp, val.av_val, play, pkt->ts_delta + 1);
         fprintf(stderr, "Playing video %s\n", val.av_val);
+        if (rtmp->play_cb) rtmp->play_cb(rtmp, val.av_val);
     }
     AMF_Reset(&obj);
 
