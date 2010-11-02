@@ -357,7 +357,8 @@ static void handle_invoke(rtmp *rtmp, rtmp_packet *pkt)
     } else if(AVMATCH(&method, &av_createStream))
     {
         int i;
-        for (i = 0; i < RTMP_MAX_STREAMS; i++) {
+        // XXX stream ids, for some reason, *must* be >1!
+        for (i = 1; i < RTMP_MAX_STREAMS; i++) {
             if (!rtmp->streams[i]) {
                 rtmp_stream *stream = malloc(sizeof(rtmp_stream));
                 if (!stream) { // TODO something drastic
@@ -365,6 +366,7 @@ static void handle_invoke(rtmp *rtmp, rtmp_packet *pkt)
                     return;
                 }
                 stream->id = i;
+                stream->name = NULL;
                 rtmp->streams[i] = stream;
                 break;
             }
@@ -426,7 +428,7 @@ static void handle_invoke(rtmp *rtmp, rtmp_packet *pkt)
     {
         AMFProp_GetString(AMF_GetProp(&obj, NULL, 3), &val);
         send_onstatus(rtmp, val.av_val, play, pkt->ts_delta + 1);
-        //ctx->stream.fds[ctx->stream.cxn_count++] = rtmp;
+        fprintf(stderr, "Playing video %s\n", val.av_val);
     }
     AMF_Reset(&obj);
 
