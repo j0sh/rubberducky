@@ -1,0 +1,3 @@
+[submodule "radixtree"]
+	path = radixtree
+	url = git://github.com/j0sh/radixtree.git
