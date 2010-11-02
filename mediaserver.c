@@ -137,9 +137,14 @@ static void close_cb(struct ev_loop *loop, ev_signal *signal, int revents)
     free_all((srv_ctx*)signal->data);
 }
 
+static inline client_ctx* get_client(rtmp *r)
+{
+    return (client_ctx*)((uint8_t*)r - offsetof(client_ctx, rtmp));
+}
+
 static void rd_rtmp_close_cb(rtmp *r)
 {
-    free_client((client_ctx*)((uint8_t*)r - offsetof(client_ctx, rtmp)));
+    free_client(get_client(r));
 }
 
 static void rd_rtmp_publish_cb(rtmp *r, rtmp_stream *stream)
@@ -148,7 +153,7 @@ static void rd_rtmp_publish_cb(rtmp *r, rtmp_stream *stream)
     client_ctx *client;
     recv_ctx *recvs;
 
-    client = (client_ctx*)((uint8_t*)r - offsetof(client_ctx, rtmp));
+    client = get_client(r);
     recvs = malloc(MAX_CLIENTS * sizeof(rtmp*) + sizeof(recv_ctx));
     if (!recvs) {
         fprintf(stderr, "Out of memory when mallocing receivers!\n");
