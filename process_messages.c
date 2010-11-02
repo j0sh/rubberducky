@@ -422,6 +422,7 @@ static void handle_invoke(rtmp *rtmp, rtmp_packet *pkt)
         }
         // TODO only for published streams
         send_onstatus(rtmp, rtmp->streams[stream_id]->name, unpublish, pkt->ts_delta + 1);
+        if (rtmp->delete_cb) rtmp->delete_cb(rtmp, rtmp->streams[stream_id]);
         rtmp_free_stream(&rtmp->streams[stream_id]);
         fprintf(stderr, "Deleting stream %d\n", stream_id);
     } else if(AVMATCH(&method, &av_play))

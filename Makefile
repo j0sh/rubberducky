@@ -5,5 +5,5 @@ OPTS=-g -Wall
 CC=gcc
 
 default:
-	$(CC) $(OPTS) $(DEPS) mediaserver.c rtmp.c rtmpfuncs.c amf.c
+	$(CC) $(OPTS) $(DEPS) mediaserver.c rtmp.c rtmpfuncs.c amf.c radixtree/radix.c
 

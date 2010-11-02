@@ -3,6 +3,7 @@
 
 #include <ev.h>
 
+#include "radixtree/radix.h"
 #include "rtmp.h"
 
 #ifndef videoapi_unused
@@ -40,6 +41,7 @@ typedef struct srv_ctx {
     struct ev_loop *loop;
     ev_io io;             /* socket listener event */
     client_ctx *clients;
+    rxt_node *streams;
 }srv_ctx;
 
 #endif //VIDEOAPI_MEDIASERVER_H

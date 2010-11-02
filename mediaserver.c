@@ -93,6 +93,7 @@ fail:
 
 static void free_client(client_ctx *client)
 {
+    int i;
     srv_ctx *ctx = client->srv;
     client_ctx *c = ctx->clients, *p = NULL;
     while (c != client) { //TODO get rid of the list
@@ -105,6 +106,14 @@ static void free_client(client_ctx *client)
         p->next = c->next;
 
     fprintf(stdout, "(%d) Disconnecting\n", c->id);
+
+    // free streams in the server tree
+    for (i = 0; i < RTMP_MAX_STREAMS; i++)
+        if (c->rtmp.streams[i] && c->rtmp.streams[i]->name) {
+            printf("Deleting stream %s\n", c->rtmp.streams[i]->name);
+            rxt_delete(c->rtmp.streams[i]->name, ctx->streams);
+        }
+
     rtmp_free(&c->rtmp);
     if (c->recvs) free(c->recvs);
     ev_io_stop(ctx->loop, &c->read_watcher);
@@ -127,6 +136,8 @@ static void free_all(srv_ctx *ctx)
     close(ctx->fd);
     ev_io_stop(ctx->loop, &ctx->io);
     ev_unloop(ctx->loop, EVUNLOOP_ALL);
+    rxt_free(ctx->streams);
+    ctx->streams = NULL;
     free(ctx);
     ctx = NULL;
     fprintf(stdout, "Shutting down\n");
@@ -152,9 +163,11 @@ static void rd_rtmp_publish_cb(rtmp *r, rtmp_stream *stream)
 #define MAX_CLIENTS 10
     client_ctx *client;
     recv_ctx *recvs;
+    srv_ctx *srv;
 
     client = get_client(r);
     recvs = malloc(MAX_CLIENTS * sizeof(rtmp*) + sizeof(recv_ctx));
+    srv = client->srv;
     if (!recvs) {
         fprintf(stderr, "Out of memory when mallocing receivers!\n");
         return; // TODO something drastic
@@ -162,7 +175,17 @@ static void rd_rtmp_publish_cb(rtmp *r, rtmp_stream *stream)
     memset(recvs, 0, MAX_CLIENTS * sizeof(rtmp*) + sizeof(recv_ctx));
     recvs->max_recvs = MAX_CLIENTS;
     client->recvs = recvs;
+
+    rxt_put(stream->name, client, srv->streams);
 #undef MAX_CLIENTS
+}
+
+static void rd_rtmp_delete_cb(rtmp *r, rtmp_stream *s)
+{
+    client_ctx *client = get_client(r);
+    srv_ctx *srv = client->srv;
+    if (s->name)
+        rxt_delete(s->name, srv->streams);
 }
 
 static void incoming_cb(struct ev_loop *loop, ev_io *io, int revents)
@@ -191,12 +214,14 @@ static void incoming_cb(struct ev_loop *loop, ev_io *io, int revents)
     ctx->connections++;
     client->srv = ctx;
     client->id = ctx->total_cxns++;
+    client->recvs = NULL;
 
     rtmp_init(&client->rtmp);
     client->rtmp.fd = clientfd;
     client->read_watcher.data = &client->rtmp;
     client->rtmp.close_cb = rd_rtmp_close_cb;
     client->rtmp.publish_cb = rd_rtmp_publish_cb;
+    client->rtmp.delete_cb = rd_rtmp_delete_cb;
 
     fcntl(clientfd, F_SETFL, O_NONBLOCK);
 
@@ -264,6 +289,7 @@ int main(int argc, char** argv)
     ctx->connections = 0;
     ctx->total_cxns = 0;
     ctx->clients = NULL;
+    ctx->streams = rxt_init();
     setup_events(ctx);
     ev_loop(ctx->loop, EVBACKEND_EPOLL);
 
