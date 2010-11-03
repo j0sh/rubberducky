@@ -57,22 +57,20 @@ void rtmp_free(rtmp *r)
 
 int rtmp_send(rtmp *r, rtmp_packet *pkt) {
     rtmp_packet *prev = r->out_channels[pkt->chunk_id];
-    uint32_t ts = pkt->timestamp;
+    uint32_t ts;
     uint8_t *header, *start, *body;
     int header_size, chunk_header_size, chunk_size, to_write;
 
-    if (prev && CHUNK_LARGE != pkt->chunk_type) {
-        if (prev->size == pkt->size &&
-            prev->msg_type == pkt->msg_type &&
-            CHUNK_MEDIUM == pkt->chunk_type) {
+    pkt->chunk_type = CHUNK_LARGE;
+    if (prev && pkt->msg_id == prev->msg_id) {
+        if (pkt->msg_type == prev->msg_type &&
+            pkt->size == prev->size) {
             pkt->chunk_type = CHUNK_SMALL;
-        } else if (prev->timestamp == pkt->timestamp &&
-            CHUNK_SMALL == pkt->chunk_type) {
-            pkt->chunk_type = CHUNK_TINY;
-        } else {
+            // XXX calculaton of ts_delta may still be fucked!
+            if (pkt->ts_delta == prev->ts_delta)
+                pkt->chunk_type = CHUNK_TINY;
+        } else
             pkt->chunk_type = CHUNK_MEDIUM;
-        }
-        ts -= prev->timestamp;
     }
 
     if (pkt->chunk_id > 319)
@@ -94,6 +92,8 @@ int rtmp_send(rtmp *r, rtmp_packet *pkt) {
         header_size = CHUNK_SIZE_LARGE;
         pkt->chunk_type = CHUNK_LARGE;
     }
+
+    ts = CHUNK_LARGE == pkt->chunk_type ? pkt->timestamp : pkt->ts_delta;
 
     if (ts >= 0xffffff) {
         header_size += 4;
@@ -161,6 +161,8 @@ int rtmp_send(rtmp *r, rtmp_packet *pkt) {
         r->out_channels[pkt->chunk_id] = p;
     }
     memcpy(r->out_channels[pkt->chunk_id], pkt, sizeof(rtmp_packet));
+    if (CHUNK_LARGE == pkt->chunk_type)
+        r->out_channels[pkt->chunk_id]->ts_delta = pkt->timestamp;
     r->out_channels[pkt->chunk_id]->body = NULL; // dont store for outbound
     r->tx += chunk_header_size + header_size + to_write;
     return chunk_header_size + header_size + to_write;
