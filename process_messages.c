@@ -409,7 +409,7 @@ static void handle_invoke(rtmp *rtmp, rtmp_packet *pkt)
                 }
         if (rtmp->publish_cb)
             rtmp->publish_cb(rtmp, stream);
-        send_onstatus(rtmp, val.av_val, publish, pkt->ts_delta + 1);
+        send_onstatus(rtmp, stream->name, publish, pkt->ts_delta + 1);
         fprintf(stdout, "publishing %s (id %d)\n",
                 stream->name, stream->id);
     } else if(AVMATCH(&method, &av_deleteStream))
@@ -427,10 +427,16 @@ static void handle_invoke(rtmp *rtmp, rtmp_packet *pkt)
         fprintf(stderr, "Deleting stream %d\n", stream_id);
     } else if(AVMATCH(&method, &av_play))
     {
+        char *streamname; // because val won't be null terminated
         AMFProp_GetString(AMF_GetProp(&obj, NULL, 3), &val);
-        send_onstatus(rtmp, val.av_val, play, pkt->ts_delta + 1);
-        fprintf(stderr, "Playing video %s\n", val.av_val);
-        if (rtmp->play_cb) rtmp->play_cb(rtmp, val.av_val);
+        streamname = malloc(val.av_len + 1);
+        if (!streamname){ errstr = "Outta memory!"; goto invoke_error; }
+        strncpy(streamname, val.av_val, val.av_len);
+        streamname[val.av_len] = '\0';
+        send_onstatus(rtmp, streamname, play, pkt->ts_delta + 1);
+        fprintf(stderr, "Playing video %s\n", streamname);
+        if (rtmp->play_cb) rtmp->play_cb(rtmp, streamname);
+        free(streamname);
     }
     AMF_Reset(&obj);
 
