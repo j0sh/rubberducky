@@ -50,27 +50,11 @@ static int send_ack(rtmp *r, int ts)
     return rtmp_send(r, &packet);
 }
 
-static int send_ping(rtmp *rtmp, int ts)
+static int send_usercontrol(rtmp *r, int msg, int data, int ts)
 {
-    uint32_t now = get_uptime();
-    uint8_t pbuf[RTMP_MAX_HEADER_SIZE+4];
-    amf_write_i32(pbuf + RTMP_MAX_HEADER_SIZE, pbuf + sizeof(pbuf), now);
-    memset(pbuf, 0, RTMP_MAX_HEADER_SIZE);
-    rtmp_packet packet = {
-        .chunk_id = 0x02,
-        .msg_id = 0,
-        .msg_type = 0x04,
-        .timestamp = ts,
-        .size = sizeof(pbuf) - RTMP_MAX_HEADER_SIZE,
-        .body = pbuf + RTMP_MAX_HEADER_SIZE
-    };
-    return rtmp_send(rtmp, &packet);
-}
-
-static int send_pong(rtmp *r, uint32_t ping_t, int ts)
-{
-    uint8_t pbuf[RTMP_MAX_HEADER_SIZE + 6],
-    *body = pbuf + RTMP_MAX_HEADER_SIZE, *end = pbuf + sizeof(pbuf);
+    uint8_t pbuf[RTMP_MAX_HEADER_SIZE + 6] = { 0 };
+    uint8_t *body = pbuf + RTMP_MAX_HEADER_SIZE,
+            *end = pbuf + sizeof(pbuf);
     rtmp_packet packet = {
         .chunk_id  = 0x02,
         .msg_id    = 0,
@@ -79,14 +63,42 @@ static int send_pong(rtmp *r, uint32_t ping_t, int ts)
         .size      = end - body,
         .body      = body
     };
-
-    amf_write_i16(body, end, 0x07);
+    amf_write_i16(body, end, msg);
     body += 2;
-    amf_write_i32(body, end, ping_t);
-    memset(pbuf, 0, RTMP_MAX_HEADER_SIZE);
+    amf_write_i32(body, end, data);
 
-    fprintf(stdout, "Sending pong %d\n", ping_t);
     return rtmp_send(r, &packet);
+}
+
+enum {
+    STREAM_BEGIN = 0,
+    STREAM_EOF,
+    STREAM_DRY,
+    SET_BUF_LEN,
+    STREAM_RECORDED,
+    PING = 6,
+    PONG
+}; // control types
+
+static inline int send_stream_begin(rtmp *r, int stream_id, int ts)
+{
+    return send_usercontrol(r, STREAM_BEGIN, stream_id, ts);
+}
+
+static inline int send_stream_recorded(rtmp *r, int stream_id, int ts)
+{
+    return send_usercontrol(r, STREAM_RECORDED, stream_id, ts);
+}
+
+static inline int send_ping(rtmp *r, int ts)
+{
+    // XXX get_uptime() should actually be the server time??
+    return send_usercontrol(r, PING, get_uptime(), ts);
+}
+
+static inline int send_pong(rtmp *r, uint32_t ping_t, int ts)
+{
+    return send_usercontrol(r, PONG, ping_t, ts);
 }
 
 static videoapi_unused int send_buflen(rtmp *r, int stream_id, int ts)
@@ -172,16 +184,6 @@ static int read_bytes(rtmp *r, uint8_t *p, int howmany)
 
 #include "handshake.c"
 #include "process_messages.c"
-
-enum {
-    STREAM_BEGIN,
-    STREAM_EOF,
-    STREAM_DRY,
-    SET_BUF_LEN,
-    STREAM_RECORDED,
-    PING,
-    PONG
-}; // control types
 
 static int handle_control(rtmp *r, rtmp_packet *pkt)
 {
