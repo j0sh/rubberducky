@@ -30,6 +30,25 @@ static inline rtmp* get_rtmp(ev_io *w)
     return (rtmp*)w->data;
 }
 
+static int send_chunksize(rtmp *r, int chunksize, int ts)
+{
+    uint8_t pbuf[RTMP_MAX_HEADER_SIZE + 4] = { 0 };
+    uint8_t *body = pbuf + RTMP_MAX_HEADER_SIZE,
+            *end = pbuf + sizeof(pbuf);
+    rtmp_packet packet = {
+        .chunk_id = 0x02,
+        .msg_id = 0,
+        .msg_type = 0x01,
+        .timestamp = ts,
+        .size = end - body,
+        .body = body
+    };
+    amf_write_i32(body, end, chunksize);
+    r->out_chunk_size = chunksize;
+    fprintf(stdout, "Setting outbound chunk size to %d bytes\n", chunksize);
+    return rtmp_send(r, &packet);
+}
+
 static int send_ack(rtmp *r, int ts)
 {
     uint8_t pbuf[RTMP_MAX_HEADER_SIZE + 4] = { 0 };
