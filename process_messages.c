@@ -130,7 +130,7 @@ static int send_cxn_resp(rtmp *rtmp, double txn, int ts)
     return rtmp_send(rtmp, &packet);
 }
 
-typedef enum {publish = 0, unpublish, play} stream_cmd;
+typedef enum {publish = 0, unpublish, play, reset} stream_cmd;
 static int send_fcpublish(rtmp *rtmp, const char *streamname,
                           double txn, stream_cmd action, int ts)
 {
@@ -197,10 +197,12 @@ static int send_onstatus(rtmp *rtmp, char *streamname,
     case play:
         //XXX this state really should be 'play pending' or something
         //TODO send PlayPublishNotify when actually ready to play
-        //TODO send Play.Reset chunk before Play.Start
         strncpy(pubstr, "NetStream.Play.Start", sizeof(pubstr));
         snprintf(tbuf, sizeof(tbuf), "%s is now published.", streamname);
         break;
+    case reset:
+        strncpy(pubstr, "NetStream.Play.Reset", sizeof(pubstr));
+        snprintf(tbuf, sizeof(tbuf), "Playing and resetting %s.", streamname);
     default:
         strncpy(pubstr, "oops", sizeof(pubstr));
     }
