@@ -266,8 +266,8 @@ static void incoming_cb(struct ev_loop *loop, ev_io *io, int revents)
 
     // we can convert this to a readable hostname later
     // during some postprocessing/analytics stage.
-    fprintf(stdout, "(%d) Accepted connection from %u\n",
-            client->id, addr.sin_addr.s_addr);
+    fprintf(stdout, "(%d) Accepted connection from %d\n",
+            client->id, clientfd);
     return;
 
 fail:
