@@ -174,6 +174,7 @@ static void rd_rtmp_publish_cb(rtmp *r, rtmp_stream *stream)
         return; // TODO something drastic
     }
     memset(recvs, 0, MAX_CLIENTS * sizeof(rtmp*) + sizeof(recv_ctx));
+    recvs->stream = stream;
     recvs->max_recvs = MAX_CLIENTS;
     recvs->list = (rtmp**)(recvs + 1);
     client->recvs = recvs;
@@ -182,7 +183,7 @@ static void rd_rtmp_publish_cb(rtmp *r, rtmp_stream *stream)
 #undef MAX_CLIENTS
 }
 
-static void rd_rtmp_play_cb(rtmp *r, char *stream_name)
+static rtmp_stream* rd_rtmp_play_cb(rtmp *r, char *stream_name)
 {
     client_ctx *listener = get_client(r);
     srv_ctx *srv = listener->srv;
@@ -203,15 +204,36 @@ static void rd_rtmp_play_cb(rtmp *r, char *stream_name)
         if (!recvs->list[i]) {
             recvs->list[i] = r;
             recvs->nb_recvs++;
-            break;
+            return recvs->stream;
         }
 
-    if (i < recvs->max_recvs) return;
     errstr = "Receiver list full!\n";
 
 play_fail:
     fprintf(stderr, "Error processing play request: %s\n", errstr);
-    return;
+    return NULL;
+}
+
+static void rd_rtmp_read_cb(rtmp *r, rtmp_packet *pkt)
+{
+    if (pkt->msg_type == 0x08 || pkt->msg_type == 0x09) {
+    client_ctx *client = get_client(r);
+    recv_ctx *recv = client->recvs;
+    int i, j;
+    if (!recv) return;
+    for (i = j = 0; j < recv->nb_recvs; i++)
+        if (recv->list[i]){
+            rtmp_packet packet;
+            // terrible
+            uint8_t *body = malloc(pkt->size + RTMP_MAX_HEADER_SIZE);
+            memcpy(&packet, pkt, sizeof(rtmp_packet));
+            memcpy(body+RTMP_MAX_HEADER_SIZE, pkt->body, pkt->size);
+            packet.body = body+RTMP_MAX_HEADER_SIZE;
+            rtmp_send(recv->list[i], &packet);
+            free(body);
+            j++;
+        }
+    }
 }
 
 static void rd_rtmp_delete_cb(rtmp *r, rtmp_stream *s)
@@ -257,6 +279,7 @@ static void incoming_cb(struct ev_loop *loop, ev_io *io, int revents)
     client->rtmp.publish_cb = rd_rtmp_publish_cb;
     client->rtmp.delete_cb = rd_rtmp_delete_cb;
     client->rtmp.play_cb = rd_rtmp_play_cb;
+    client->rtmp.read_cb = rd_rtmp_read_cb;
 
     fcntl(clientfd, F_SETFL, O_NONBLOCK);
 

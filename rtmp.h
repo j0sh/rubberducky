@@ -100,7 +100,7 @@ typedef struct rtmp {
     void (*close_cb)(struct rtmp *r);
     void (*publish_cb)(struct rtmp *r, rtmp_stream *s);
     void (*delete_cb)(struct rtmp *r, rtmp_stream *s);
-    void (*play_cb)(struct rtmp *r, char *stream_name);
+    rtmp_stream* (*play_cb)(struct rtmp *r, char *stream_name);
 }rtmp;
 
 void rtmp_init(rtmp *r);

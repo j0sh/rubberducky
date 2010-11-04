@@ -431,14 +431,31 @@ static void handle_invoke(rtmp *rtmp, rtmp_packet *pkt)
     } else if(AVMATCH(&method, &av_play))
     {
         char *streamname; // because val won't be null terminated
+        int start, duration, reset, ts = pkt->timestamp + 1;
+        rtmp_stream *stream;
         AMFProp_GetString(AMF_GetProp(&obj, NULL, 3), &val);
+        start = (int)AMFProp_GetNumber(AMF_GetProp(&obj, NULL, 4));
+        duration = (int)AMFProp_GetNumber(AMF_GetProp(&obj, NULL, 5));
+        reset = AMFProp_GetBoolean(AMF_GetProp(&obj, NULL, 6));
+
         streamname = malloc(val.av_len + 1);
         if (!streamname){ errstr = "Outta memory!"; goto invoke_error; }
         strncpy(streamname, val.av_val, val.av_len);
         streamname[val.av_len] = '\0';
         send_onstatus(rtmp, streamname, play, pkt->timestamp + 1);
+
+        if (rtmp->play_cb) stream = rtmp->play_cb(rtmp, streamname);
+        if (!stream) return;
+
+        // send allll the messages flash player requires
+        send_chunksize(rtmp, 1400, ts++); // close to MTU
+        // XXX send streamisrecorded usercontrol message (????)
+        send_stream_begin(rtmp, stream->id, ts++);
+        send_onstatus(rtmp, streamname, play, ts++);
+        if (reset)
+            send_onstatus(rtmp, streamname, reset, ts++);
+
         fprintf(stderr, "Playing video %s\n", streamname);
-        if (rtmp->play_cb) rtmp->play_cb(rtmp, streamname);
         free(streamname);
     }
     AMF_Reset(&obj);

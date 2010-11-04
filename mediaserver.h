@@ -19,6 +19,7 @@
 
 typedef struct {
     rtmp **list;
+    rtmp_stream *stream;
     int nb_recvs;
     int max_recvs;
 }recv_ctx;
