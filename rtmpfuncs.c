@@ -62,11 +62,12 @@ int rtmp_send(rtmp *r, rtmp_packet *pkt) {
     int header_size, chunk_header_size, chunk_size, to_write;
 
     pkt->chunk_type = CHUNK_LARGE;
+    pkt->ts_delta = pkt->timestamp - (prev? prev->timestamp : 0);
+
     if (prev && pkt->msg_id == prev->msg_id) {
         if (pkt->msg_type == prev->msg_type &&
             pkt->size == prev->size) {
             pkt->chunk_type = CHUNK_SMALL;
-            // XXX calculaton of ts_delta may still be fucked!
             if (pkt->ts_delta == prev->ts_delta)
                 pkt->chunk_type = CHUNK_TINY;
         } else

@@ -335,25 +335,26 @@ static void handle_invoke(rtmp *rtmp, rtmp_packet *pkt)
 
     if(AVMATCH(&method, &av_connect))
     {
-        send_ack_size(rtmp, pkt->ts_delta + 1);
-        send_peer_bw(rtmp, pkt->ts_delta + 2);
-        send_ping(rtmp, pkt->ts_delta + 3);
-        send_onbw_done(rtmp, pkt->ts_delta + 4);
+        int ts = pkt->timestamp + 1;
+        send_ack_size(rtmp, ts++);
+        send_peer_bw(rtmp, ts++);
+        send_ping(rtmp, ts++);
+        send_onbw_done(rtmp, ts++);
         handle_connect(rtmp, pkt, &obj);
-        send_cxn_resp(rtmp, txn, pkt->ts_delta + 5);
+        send_cxn_resp(rtmp, txn, ts++);
     } else if(AVMATCH(&method, &av_releaseStream))
     {
-        send_result(rtmp, txn, pkt->msg_id, pkt->ts_delta + 1);
+        send_result(rtmp, txn, pkt->msg_id, pkt->timestamp + 1);
     } else if(AVMATCH(&method, &av_FCPublish))
     {
-        send_result(rtmp, txn, pkt->msg_id, pkt->ts_delta + 1);
+        send_result(rtmp, txn, pkt->msg_id, pkt->timestamp + 1);
         AMFProp_GetString(AMF_GetProp(&obj, NULL, 3), &val);
-        send_fcpublish(rtmp, val.av_val, txn, publish, pkt->ts_delta + 2);
+        send_fcpublish(rtmp, val.av_val, txn, publish, pkt->timestamp + 2);
     } else if(AVMATCH(&method, &av_FCUnpublish))
     {
-        send_result(rtmp, txn, pkt->msg_id, pkt->ts_delta + 1);
+        send_result(rtmp, txn, pkt->msg_id, pkt->timestamp + 1);
         AMFProp_GetString(AMF_GetProp(&obj, NULL, 3), &val);
-        send_fcpublish(rtmp, val.av_val, txn, unpublish, pkt->ts_delta + 2);
+        send_fcpublish(rtmp, val.av_val, txn, unpublish, pkt->timestamp + 2);
     } else if(AVMATCH(&method, &av_createStream))
     {
         int i;
@@ -372,7 +373,7 @@ static void handle_invoke(rtmp *rtmp, rtmp_packet *pkt)
             }
         }
         if (i != RTMP_MAX_STREAMS)
-            send_result(rtmp, txn, rtmp->streams[i]->id, pkt->ts_delta + 1);
+            send_result(rtmp, txn, rtmp->streams[i]->id, pkt->timestamp + 1);
         else
             fprintf(stderr, "Maximum number of streams exceeded!\n");
     } else if(AVMATCH(&method, &av_publish))
@@ -409,7 +410,7 @@ static void handle_invoke(rtmp *rtmp, rtmp_packet *pkt)
                 }
         if (rtmp->publish_cb)
             rtmp->publish_cb(rtmp, stream);
-        send_onstatus(rtmp, stream->name, publish, pkt->ts_delta + 1);
+        send_onstatus(rtmp, stream->name, publish, pkt->timestamp + 1);
         fprintf(stdout, "publishing %s (id %d)\n",
                 stream->name, stream->id);
     } else if(AVMATCH(&method, &av_deleteStream))
@@ -421,7 +422,7 @@ static void handle_invoke(rtmp *rtmp, rtmp_packet *pkt)
             return;
         }
         // TODO only for published streams
-        send_onstatus(rtmp, rtmp->streams[stream_id]->name, unpublish, pkt->ts_delta + 1);
+        send_onstatus(rtmp, rtmp->streams[stream_id]->name, unpublish, pkt->timestamp + 1);
         if (rtmp->delete_cb) rtmp->delete_cb(rtmp, rtmp->streams[stream_id]);
         rtmp_free_stream(&rtmp->streams[stream_id]);
         fprintf(stderr, "Deleting stream %d\n", stream_id);
@@ -433,7 +434,7 @@ static void handle_invoke(rtmp *rtmp, rtmp_packet *pkt)
         if (!streamname){ errstr = "Outta memory!"; goto invoke_error; }
         strncpy(streamname, val.av_val, val.av_len);
         streamname[val.av_len] = '\0';
-        send_onstatus(rtmp, streamname, play, pkt->ts_delta + 1);
+        send_onstatus(rtmp, streamname, play, pkt->timestamp + 1);
         fprintf(stderr, "Playing video %s\n", streamname);
         if (rtmp->play_cb) rtmp->play_cb(rtmp, streamname);
         free(streamname);
