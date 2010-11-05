@@ -267,6 +267,23 @@ peerbw_fail:
     return -1;
 }
 
+static void handle_notify(rtmp *r, rtmp_packet *pkt)
+{
+    if (!memcmp("\x02\x00\x0d@setDataFrame", (char*)pkt->body, 16)) {
+        rtmp_stream *s = r->streams[pkt->msg_id];
+        int size = pkt->size - 16;
+        s->metadata = malloc(RTMP_MAX_HEADER_SIZE + size + 1);
+        if (!s->metadata) {
+            fprintf(stderr, "Out of memory for metadata!\n");
+            return;
+        }
+        memcpy(s->metadata + RTMP_MAX_HEADER_SIZE, pkt->body + 16, size);
+        s->metadata[RTMP_MAX_HEADER_SIZE + size] = '\0';
+        s->metadata_size = size;
+    } else
+        fprintf(stdout, "Unhandled metadata!\n");
+}
+
 static int handle_msg(rtmp *r, struct rtmp_packet *pkt, ev_io *io)
 {
     switch (pkt->msg_type) {
@@ -292,6 +309,9 @@ static int handle_msg(rtmp *r, struct rtmp_packet *pkt, ev_io *io)
     case 0x08:
     case 0x09:
         break; // audio and video
+    case 0x12:
+        handle_notify(r, pkt);
+        break;
     case 0x11: // Flex message
     case 0x14:
         handle_invoke(r, pkt);

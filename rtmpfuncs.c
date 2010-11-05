@@ -23,6 +23,8 @@ void rtmp_free_stream(rtmp_stream **stream)
     if (!s) return;
     if (s->name) free(s->name);
     s->name = NULL;
+    if (s->metadata) free(s->metadata);
+    s->metadata = NULL;
     free(s);
     *stream = NULL;
 }

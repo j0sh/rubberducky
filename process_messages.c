@@ -306,6 +306,22 @@ static void handle_connect(rtmp *rtmp, rtmp_packet *pkt, AMFObject *obj)
         }
 }
 
+static int send_metadata(rtmp *r, rtmp_stream *stream)
+{
+    uint8_t *body = stream->metadata + RTMP_MAX_HEADER_SIZE;
+    int size = stream->metadata_size;
+    rtmp_packet packet = {
+        .chunk_id = 0x04,
+        .msg_id = stream->id,
+        .msg_type = 0x12,
+        .timestamp = 0,
+        .body = body,
+        .size = size
+    };
+    fprintf(stdout, "Sending metadata!\n");
+    return rtmp_send(r, &packet);
+}
+
 static void handle_invoke(rtmp *rtmp, rtmp_packet *pkt)
 {
     uint8_t *body = pkt->body;
@@ -454,6 +470,7 @@ static void handle_invoke(rtmp *rtmp, rtmp_packet *pkt)
         send_onstatus(rtmp, streamname, play, ts++);
         if (reset)
             send_onstatus(rtmp, streamname, reset, ts++);
+        send_metadata(rtmp, stream);
 
         fprintf(stderr, "Playing video %s\n", streamname);
         free(streamname);

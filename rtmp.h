@@ -69,6 +69,8 @@ typedef struct rtmp_packet {
 typedef struct rtmp_stream {
     int id;
     int type;
+    int metadata_size;
+    uint8_t *metadata;
     char *name;
 }rtmp_stream;
 
