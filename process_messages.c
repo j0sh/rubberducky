@@ -211,6 +211,7 @@ static int send_onstatus(rtmp *rtmp, char *streamname,
     enc = amf_write_str_kv(enc, end, "level", "status");
     enc = amf_write_str_kv(enc, end, "code", pubstr);
     enc = amf_write_str_kv(enc, end, "description", tbuf);
+    enc = amf_write_str_kv(enc, end, "details", streamname);
     enc = amf_write_str_kv(enc, end, "clientid", "RUBBERDUCKY"); // TODO fix
     *enc++ = 0;
     *enc++ = 0;
