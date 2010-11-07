@@ -202,6 +202,7 @@ static rtmp_stream* rd_rtmp_play_cb(rtmp *r, char *stream_name)
     }
     for (i = 0; i < recvs->max_recvs; i++)
         if (!recvs->list[i]) {
+            r->keyframe_pending = 3;
             recvs->list[i] = r;
             recvs->nb_recvs++;
             return recvs->stream;
@@ -214,6 +215,25 @@ play_fail:
     return NULL;
 }
 
+static int keyframe_still_pending(rtmp *listener, rtmp_packet *pkt)
+{
+    if (2 & listener->keyframe_pending &&
+        0x08 == pkt->msg_type &&
+        ((pkt->body[0] >> 4) == 10) && !pkt->body[1]) {
+        listener->keyframe_pending &= ~2;
+        printf("audio packet\n");
+    }
+    else if (1 & listener->keyframe_pending &&
+             0x09 == pkt->msg_type &&
+             0x10 == (0xf0 & *pkt->body)) {
+        // for the very first frame its probably better
+        // to send as a large 12byte header w/ msg id and all
+      listener->keyframe_pending &= ~1;
+      printf("KEYFRAME FOUND\n");
+    }
+    return listener->keyframe_pending;
+}
+
 static void rd_rtmp_read_cb(rtmp *r, rtmp_packet *pkt)
 {
     if (pkt->msg_type == 0x08 || pkt->msg_type == 0x09) {
@@ -223,8 +243,15 @@ static void rd_rtmp_read_cb(rtmp *r, rtmp_packet *pkt)
     if (!recv) return;
     for (i = j = 0; j < recv->nb_recvs; i++)
         if (recv->list[i]){
+
+            // for receiver's first packet(s), skip up to keyframe
+            if (recv->list[i]->keyframe_pending &&
+                keyframe_still_pending(recv->list[i], pkt)) {
+                return;
+            }
+
+            // memcpy every packet and body for each client? VOMIT
             rtmp_packet packet;
-            // terrible
             uint8_t *body = malloc(pkt->size + RTMP_MAX_HEADER_SIZE);
             memcpy(&packet, pkt, sizeof(rtmp_packet));
             memcpy(body+RTMP_MAX_HEADER_SIZE, pkt->body, pkt->size);

@@ -93,6 +93,9 @@ typedef struct rtmp {
     rtmp_packet *prev_pkt; // used when chunks are split across tcp packets
     int chunk_alignment;
 
+    // for streaming
+    int keyframe_pending;
+
     rtmp_packet *in_channels[RTMP_CHANNELS]; // find a better way
     rtmp_packet *out_channels[RTMP_CHANNELS];
     rtmp_stream *streams[RTMP_MAX_STREAMS];
