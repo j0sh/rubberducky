@@ -301,6 +301,7 @@ static void handle_audio(rtmp *r, rtmp_packet *pkt)
             free(r->streams[pkt->msg_id]->aac_seq);
         }
         r->streams[pkt->msg_id]->aac_seq = cache;
+        r->streams[pkt->msg_id]->aac_seq_size = pkt->size;
         fprintf(stdout, "AAC extradata cached %d.\n", pkt->size);
     }
 }
