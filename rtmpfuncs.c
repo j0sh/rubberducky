@@ -25,6 +25,8 @@ void rtmp_free_stream(rtmp_stream **stream)
     s->name = NULL;
     if (s->metadata) free(s->metadata);
     s->metadata = NULL;
+    if (s->aac_seq) free(s->aac_seq);
+    s->aac_seq = NULL;
     free(s);
     *stream = NULL;
 }

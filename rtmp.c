@@ -284,6 +284,27 @@ static void handle_notify(rtmp *r, rtmp_packet *pkt)
         fprintf(stdout, "Unhandled metadata!\n");
 }
 
+static void handle_audio(rtmp *r, rtmp_packet *pkt)
+{
+    // intercept the AAC sequence header and cache it
+    if (10 == (pkt->body[0] >> 4) && !pkt->body[1]) {
+        uint8_t *cache = malloc(pkt->size + RTMP_MAX_HEADER_SIZE);
+        if (!cache) {
+            fprintf(stderr, "Out of memory for AAC cache!\n");
+            return;
+        }
+        memcpy(cache + RTMP_MAX_HEADER_SIZE, pkt->body, pkt->size);
+        if (r->streams[pkt->msg_id]->aac_seq) {
+            // AFAIK this should not really happen as the AAC sequence
+            // is only really stored at the beginning of the stream
+            fprintf(stdout, "Warning: removing previous AAC sequence.\n");
+            free(r->streams[pkt->msg_id]->aac_seq);
+        }
+        r->streams[pkt->msg_id]->aac_seq = cache;
+        fprintf(stdout, "AAC extradata cached %d.\n", pkt->size);
+    }
+}
+
 static int handle_msg(rtmp *r, struct rtmp_packet *pkt, ev_io *io)
 {
     switch (pkt->msg_type) {
@@ -306,9 +327,11 @@ static int handle_msg(rtmp *r, struct rtmp_packet *pkt, ev_io *io)
         break;
     case 0x07: // for edge-origin distribution
         break;
-    case 0x08:
-    case 0x09:
-        break; // audio and video
+    case 0x08: // audio
+        handle_audio(r, pkt);
+        break;
+    case 0x09: // video
+        break;
     case 0x12:
         handle_notify(r, pkt);
         break;

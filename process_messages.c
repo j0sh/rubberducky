@@ -307,6 +307,22 @@ static void handle_connect(rtmp *rtmp, rtmp_packet *pkt, AMFObject *obj)
         }
 }
 
+static int send_aac_seq(rtmp *r, rtmp_stream *stream)
+{
+    uint8_t *body = stream->aac_seq + RTMP_MAX_HEADER_SIZE;
+    int size = stream->aac_seq_size;
+    rtmp_packet packet = {
+        .chunk_id  = 0x04,
+        .msg_id    = stream->id,
+        .msg_type  = 0x08,
+        .timestamp = 0,
+        .body      = body,
+        .size      = size
+    };
+    fprintf(stdout, "Sending AAC sequence header.\n");
+    return rtmp_send(r, &packet);
+}
+
 static int send_metadata(rtmp *r, rtmp_stream *stream)
 {
     uint8_t *body = stream->metadata + RTMP_MAX_HEADER_SIZE;
@@ -427,6 +443,8 @@ static void handle_invoke(rtmp *rtmp, rtmp_packet *pkt)
                 } else if (!strncmp(type.av_val, "append", 6)) {
                     stream->type = APPEND;
                 }
+                stream->metadata = stream->aac_seq = NULL;
+                stream->metadata_size = stream->aac_seq_size = 0;
         if (rtmp->publish_cb)
             rtmp->publish_cb(rtmp, stream);
         send_onstatus(rtmp, stream->name, publish, pkt->timestamp + 1);
@@ -472,6 +490,7 @@ static void handle_invoke(rtmp *rtmp, rtmp_packet *pkt)
         if (reset)
             send_onstatus(rtmp, streamname, reset, ts++);
         send_metadata(rtmp, stream);
+        if (stream->aac_seq) send_aac_seq(rtmp, stream);
 
         fprintf(stderr, "Playing video %s\n", streamname);
         free(streamname);
