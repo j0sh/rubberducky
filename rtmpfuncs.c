@@ -66,7 +66,8 @@ int rtmp_send(rtmp *r, rtmp_packet *pkt) {
     int header_size, chunk_header_size, chunk_size, to_write;
 
     pkt->chunk_type = CHUNK_LARGE;
-    pkt->ts_delta = pkt->timestamp - (prev? prev->timestamp : 0);
+    if (!prev) pkt->ts_delta = 0;
+    else pkt->ts_delta = pkt->timestamp - prev->timestamp;
 
     if (prev && pkt->msg_id == prev->msg_id) {
         if (pkt->msg_type == prev->msg_type &&
