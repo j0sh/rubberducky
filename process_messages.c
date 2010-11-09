@@ -216,7 +216,7 @@ static int send_onstatus(rtmp *r, rtmp_stream *s,
     rtmp_packet packet = {
         .chunk_id = 0x04,
         .msg_type = 0x14,
-        .msg_id = 0,
+        .msg_id = s->id,
         .timestamp = ts,
         .size = enc - foo,
         .body = foo
