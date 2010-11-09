@@ -86,14 +86,12 @@ static int send_cxn_resp(rtmp *rtmp, double txn, int ts)
   AMFObjectProperty p, op;
 
     packet.chunk_id = 0x03; // control channel
-    packet.chunk_type = CHUNK_MEDIUM;
     packet.msg_type = 0x14;
     packet.msg_id = 0;
     packet.timestamp = ts;
-    packet.body = pbuf + RTMP_MAX_HEADER_SIZE;
+    packet.body = enc = pbuf + RTMP_MAX_HEADER_SIZE;
 
-    memset(pbuf, 0, RTMP_MAX_HEADER_SIZE);
-  enc = amf_write_str(packet.body, pend, "_result");
+  enc = amf_write_str(enc, pend, "_result");
   enc = amf_write_dbl(enc, pend, txn);
   *enc++ = AMF_OBJECT;
 
