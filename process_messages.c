@@ -169,7 +169,7 @@ static int send_fcpublish(rtmp *rtmp, const char *streamname,
     return rtmp_send(rtmp, &packet);
 }
 
-static int send_onstatus(rtmp *r, char *streamname,
+static int send_onstatus(rtmp *r, rtmp_stream *s,
                          stream_cmd action, int ts)
 {
     uint8_t pbuf[256], *end = pbuf+sizeof(pbuf), *enc = pbuf+RTMP_MAX_HEADER_SIZE, *foo;
@@ -183,21 +183,21 @@ static int send_onstatus(rtmp *r, char *streamname,
     switch(action) {
     case publish:
         strncpy(pubstr, "NetStream.Publish.Start", sizeof(pubstr));
-        snprintf(tbuf, sizeof(tbuf), "%s is now published.", streamname);
+        snprintf(tbuf, sizeof(tbuf), "%s is now published.", s->name);
         break;
     case unpublish:
         strncpy(pubstr, "NetStream.Unpublish.Success", sizeof(pubstr));
-        snprintf(tbuf, sizeof(tbuf), "%s is now unpublished.", streamname);
+        snprintf(tbuf, sizeof(tbuf), "%s is now unpublished.", s->name);
         break;
     case play:
         //XXX this state really should be 'play pending' or something
         //TODO send PlayPublishNotify when actually ready to play
         strncpy(pubstr, "NetStream.Play.Start", sizeof(pubstr));
-        snprintf(tbuf, sizeof(tbuf), "%s is now published.", streamname);
+        snprintf(tbuf, sizeof(tbuf), "%s is now published.", s->name);
         break;
     case reset:
         strncpy(pubstr, "NetStream.Play.Reset", sizeof(pubstr));
-        snprintf(tbuf, sizeof(tbuf), "Playing and resetting %s.", streamname);
+        snprintf(tbuf, sizeof(tbuf), "Playing and resetting %s.", s->name);
     default:
         strncpy(pubstr, "oops", sizeof(pubstr));
     }
@@ -206,7 +206,7 @@ static int send_onstatus(rtmp *r, char *streamname,
     enc = amf_write_str_kv(enc, end, "level", "status");
     enc = amf_write_str_kv(enc, end, "code", pubstr);
     enc = amf_write_str_kv(enc, end, "description", tbuf);
-    enc = amf_write_str_kv(enc, end, "details", streamname);
+    enc = amf_write_str_kv(enc, end, "details", s->name);
     enc = amf_write_str_kv(enc, end, "clientid", "RUBBERDUCKY"); // TODO fix
     *enc++ = 0;
     *enc++ = 0;
@@ -442,7 +442,7 @@ static void handle_invoke(rtmp *rtmp, rtmp_packet *pkt)
                 stream->metadata_size = stream->aac_seq_size = 0;
         if (rtmp->publish_cb)
             rtmp->publish_cb(rtmp, stream);
-        send_onstatus(rtmp, stream->name, publish, pkt->timestamp + 1);
+        send_onstatus(rtmp, stream, publish, pkt->timestamp + 1);
         fprintf(stdout, "publishing %s (id %d)\n",
                 stream->name, stream->id);
     } else if(AVMATCH(&method, &av_deleteStream))
@@ -454,7 +454,7 @@ static void handle_invoke(rtmp *rtmp, rtmp_packet *pkt)
             return;
         }
         // TODO only for published streams
-        send_onstatus(rtmp, rtmp->streams[stream_id]->name, unpublish, pkt->timestamp + 1);
+        send_onstatus(rtmp, rtmp->streams[stream_id], unpublish, pkt->timestamp + 1);
         if (rtmp->delete_cb) rtmp->delete_cb(rtmp, rtmp->streams[stream_id]);
         rtmp_free_stream(&rtmp->streams[stream_id]);
         fprintf(stderr, "Deleting stream %d\n", stream_id);
@@ -472,18 +472,18 @@ static void handle_invoke(rtmp *rtmp, rtmp_packet *pkt)
         if (!streamname){ errstr = "Outta memory!"; goto invoke_error; }
         strncpy(streamname, val.av_val, val.av_len);
         streamname[val.av_len] = '\0';
-        send_onstatus(rtmp, streamname, play, pkt->timestamp + 1);
 
         if (rtmp->play_cb) stream = rtmp->play_cb(rtmp, streamname);
         if (!stream) return;
 
         // send allll the messages flash player requires
+        send_onstatus(rtmp, stream, play, pkt->timestamp + 1);
         send_chunksize(rtmp, 1400, ts++); // close to MTU
         // XXX send streamisrecorded usercontrol message (????)
         send_stream_begin(rtmp, stream->id, ts++);
-        send_onstatus(rtmp, streamname, play, ts++);
+        send_onstatus(rtmp, stream, play, ts++);
         if (reset)
-            send_onstatus(rtmp, streamname, reset, ts++);
+            send_onstatus(rtmp, stream, reset, ts++);
         send_metadata(rtmp, stream);
         if (stream->aac_seq) send_aac_seq(rtmp, stream);
 
