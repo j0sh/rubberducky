@@ -59,6 +59,17 @@ void rtmp_free(rtmp *r)
     if (r->url) free(r->url);
 }
 
+// really useless, should have a define stubbing this out for LE systems
+static inline int write_i32_le(uint8_t *buf, uint8_t *end, int n)
+{
+    if (end - buf < 4) return 0;
+    buf[0] = (n >> 0)  & 0xff;
+    buf[1] = (n >> 8)  & 0xff;
+    buf[2] = (n >> 16) & 0xff;
+    buf[3] = (n >> 24) & 0xff;
+    return 4;
+}
+
 int rtmp_send(rtmp *r, rtmp_packet *pkt) {
     rtmp_packet *prev = r->out_channels[pkt->chunk_id];
     uint32_t ts;
@@ -118,7 +129,7 @@ int rtmp_send(rtmp *r, rtmp_packet *pkt) {
     header += chunk_header_size; // fast-forward; skip chunk hdr for now
     switch (pkt->chunk_type) {
     case CHUNK_LARGE:
-        amf_write_i24(&header[7], &header[7]+header_size, pkt->msg_id);
+        write_i32_le(&header[7], &header[7]+header_size, pkt->msg_id);
     case CHUNK_MEDIUM:
         header[6] = pkt->msg_type;
         amf_write_i24(&header[3], &header[3]+header_size, pkt->size);
