@@ -169,7 +169,7 @@ static int send_fcpublish(rtmp *rtmp, const char *streamname,
     return rtmp_send(rtmp, &packet);
 }
 
-static int send_onstatus(rtmp *rtmp, char *streamname,
+static int send_onstatus(rtmp *r, char *streamname,
                          stream_cmd action, int ts)
 {
     uint8_t pbuf[256], *end = pbuf+sizeof(pbuf), *enc = pbuf+RTMP_MAX_HEADER_SIZE, *foo;
@@ -222,7 +222,7 @@ static int send_onstatus(rtmp *rtmp, char *streamname,
         .body = foo
     };
 
-    return rtmp_send(rtmp, &packet);
+    return rtmp_send(r, &packet);
 }
 
 static void handle_connect(rtmp *rtmp, rtmp_packet *pkt, AMFObject *obj)
