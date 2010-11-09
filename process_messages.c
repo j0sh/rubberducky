@@ -477,7 +477,6 @@ static void handle_invoke(rtmp *rtmp, rtmp_packet *pkt)
         if (!stream) return;
 
         // send allll the messages flash player requires
-        send_onstatus(rtmp, stream, play, pkt->timestamp + 1);
         send_chunksize(rtmp, 1400, ts++); // close to MTU
         // XXX send streamisrecorded usercontrol message (????)
         send_stream_begin(rtmp, stream->id, ts++);
