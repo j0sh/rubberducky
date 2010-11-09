@@ -120,9 +120,6 @@ static int send_cxn_resp(rtmp *rtmp, double txn, int ts)
   *enc++ = 0;
   *enc++ = 0;
   *enc++ = AMF_OBJECT_END;
-  *enc++ = 0;
-  *enc++ = 0;
-  *enc++ = AMF_OBJECT_END;
 
     packet.size = enc - packet.body;
     return rtmp_send(rtmp, &packet);
