@@ -329,6 +329,31 @@ static void handle_audio(rtmp *r, rtmp_packet *pkt)
     }
 }
 
+static void handle_video(rtmp *r, rtmp_packet *pkt)
+{
+    // intercept the AVC sequence header and cache it
+    if (7 == (pkt->body[0] & 0x0f) && !pkt->body[1]) {
+        uint8_t *cache = malloc(pkt->size + RTMP_MAX_HEADER_SIZE);
+        if (!cache) {
+            fprintf(stderr, "Out of memory for AVC cache!\n");
+            return;
+        }
+        memcpy(cache + RTMP_MAX_HEADER_SIZE, pkt->body, pkt->size);
+        if (r->streams[pkt->msg_id]->avc_seq) {
+            // AVC sequence is only really stored at stream start
+            fprintf(stderr, "Warning: removing previous AVC sequence.\n");
+            free(r->streams[pkt->msg_id]->avc_seq);
+        }
+        r->streams[pkt->msg_id]->avc_seq = cache;
+        r->streams[pkt->msg_id]->avc_seq_size = pkt->size;
+        fprintf(stdout, "AVC extradata cached %d.\n", pkt->size);
+    }
+
+    if (5 == (pkt->body[0] & 0x0f)) {
+        fprintf(stderr, "Got  video info/command frame; what to do??\n");
+    }
+}
+
 static int handle_msg(rtmp *r, struct rtmp_packet *pkt, ev_io *io)
 {
     switch (pkt->msg_type) {
@@ -355,6 +380,7 @@ static int handle_msg(rtmp *r, struct rtmp_packet *pkt, ev_io *io)
         handle_audio(r, pkt);
         break;
     case 0x09: // video
+        handle_video(r, pkt);
         break;
     case 0x12:
         handle_notify(r, pkt);

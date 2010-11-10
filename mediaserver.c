@@ -202,7 +202,7 @@ static rtmp_stream* rd_rtmp_play_cb(rtmp *r, char *stream_name)
     }
     for (i = 0; i < recvs->max_recvs; i++)
         if (!recvs->list[i]) {
-            r->keyframe_pending = 1;
+            r->keyframe_pending = recvs->stream->vcodec == 2; // h263 only
             recvs->list[i] = r;
             recvs->nb_recvs++;
             return recvs->stream;

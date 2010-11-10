@@ -76,6 +76,8 @@ typedef struct rtmp_stream {
     uint8_t *metadata;
     int aac_seq_size; // AAC sequence header
     uint8_t *aac_seq;
+    int avc_seq_size;
+    uint8_t *avc_seq; // AVC sequence header
     char *name;
 }rtmp_stream;
 
