@@ -267,9 +267,31 @@ peerbw_fail:
     return -1;
 }
 
+static void parse_metadata(rtmp *r, rtmp_packet *pkt, int offset)
+{
+    // only extract the things we care about
+    AMFObject metadata, metaobjs;
+    rtmp_stream *stream = r->streams[pkt->msg_id];
+    int len = AMF_Decode(&metadata, (char*)(pkt->body + offset),
+                         (pkt->size - offset), FALSE);
+    if (len < 0) {
+        fprintf(stderr, "Error decoding metadata!\n");
+        return;
+    }
+
+    // slight problem: zero will be returned if the key is not found,
+    // but zero is a valid audio codec ID (linear PCM).
+    // let's hope we don't have any LPCM-specific stuff
+    // TODO check bounds, especially validity of metaobjs
+    AMFProp_GetObject(AMF_GetProp(&metadata, NULL, 0), &metaobjs); //ugh
+    stream->vcodec = (int)amf_read_dbl_kv(&metaobjs, "videocodecid");
+    stream->acodec = (int)amf_read_dbl_kv(&metaobjs, "audiocodecid");
+}
+
 static void handle_notify(rtmp *r, rtmp_packet *pkt)
 {
-    if (!memcmp("\x02\x00\x0d@setDataFrame", (char*)pkt->body, 16)) {
+    if (!memcmp("\x02\x00\x0d@setDataFrame\x02\x00\x0aonMetaData",
+                (char*)pkt->body, 29)) {
         rtmp_stream *s = r->streams[pkt->msg_id];
         int size = pkt->size - 16;
         s->metadata = malloc(RTMP_MAX_HEADER_SIZE + size + 1);
@@ -280,6 +302,7 @@ static void handle_notify(rtmp *r, rtmp_packet *pkt)
         memcpy(s->metadata + RTMP_MAX_HEADER_SIZE, pkt->body + 16, size);
         s->metadata[RTMP_MAX_HEADER_SIZE + size] = '\0';
         s->metadata_size = size;
+        parse_metadata(r, pkt, 29);
     } else
         fprintf(stdout, "Unhandled metadata!\n");
 }

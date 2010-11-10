@@ -69,6 +69,7 @@ typedef struct rtmp_packet {
 typedef struct rtmp_stream {
     int id;
     int type;
+    int acodec, vcodec;
 
     // various caches
     int metadata_size;
