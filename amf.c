@@ -65,6 +65,13 @@ double inline amf_read_dbl(const uint8_t *b)
     return (double)AMF_DecodeNumber((const char*)b);
 }
 
+double inline amf_read_dbl_kv(AMFObject *o, const char *k)
+{
+    // ideally AMFObject *o would be const but the compiler complains
+    AVal a = AVALSTR(k);
+    return AMFProp_GetNumber(AMF_GetProp(o, &a, -1));
+}
+
 void inline amf_read_str(const uint8_t *b, AVal *a)
 {
     AMF_DecodeString((const char *)b, a);

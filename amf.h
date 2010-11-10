@@ -22,6 +22,7 @@ uint32_t amf_read_i32(const uint8_t *b);
 uint32_t amf_read_i24(const uint8_t *b);
 uint32_t amf_read_i16(const uint8_t *b);
 double   amf_read_dbl(const uint8_t *b);
+double   amf_read_dbl_kv(AMFObject *o, const char *k);
 void     amf_read_str(const uint8_t *b, AVal *a);
 
 #endif
