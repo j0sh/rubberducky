@@ -396,8 +396,8 @@ static void handle_invoke(rtmp *rtmp, rtmp_packet *pkt)
                     fprintf(stderr, "Out of memory for stream!\n");
                     return;
                 }
+                memset(stream, 0, sizeof(rtmp_stream));
                 stream->id = i;
-                stream->name = NULL;
                 rtmp->streams[i] = stream;
                 break;
             }
@@ -438,8 +438,6 @@ static void handle_invoke(rtmp *rtmp, rtmp_packet *pkt)
                 } else if (!strncmp(type.av_val, "append", 6)) {
                     stream->type = APPEND;
                 }
-                stream->metadata = stream->aac_seq = NULL;
-                stream->metadata_size = stream->aac_seq_size = 0;
         if (rtmp->publish_cb)
             rtmp->publish_cb(rtmp, stream);
         send_onstatus(rtmp, stream, publish, pkt->timestamp + 1);
