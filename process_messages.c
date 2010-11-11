@@ -350,7 +350,7 @@ static int send_metadata(rtmp *r, rtmp_stream *stream)
     return rtmp_send(r, &packet);
 }
 
-static void handle_invoke(rtmp *rtmp, rtmp_packet *pkt)
+static void handle_invoke(rtmp *r, rtmp_packet *pkt)
 {
     uint8_t *body = pkt->body;
     int pkt_len = pkt->size;
@@ -382,31 +382,31 @@ static void handle_invoke(rtmp *rtmp, rtmp_packet *pkt)
     if(AVMATCH(&method, &av_connect))
     {
         int ts = pkt->timestamp + 1;
-        send_ack_size(rtmp, ts++);
-        send_peer_bw(rtmp, ts++);
-        send_ping(rtmp, ts++);
-        send_onbw_done(rtmp, ts++);
-        handle_connect(rtmp, pkt, &obj);
-        send_cxn_resp(rtmp, txn, ts++);
+        send_ack_size(r, ts++);
+        send_peer_bw(r, ts++);
+        send_ping(r, ts++);
+        send_onbw_done(r, ts++);
+        handle_connect(r, pkt, &obj);
+        send_cxn_resp(r, txn, ts++);
     } else if(AVMATCH(&method, &av_releaseStream))
     {
-        send_result(rtmp, txn, pkt->msg_id, pkt->timestamp + 1);
+        send_result(r, txn, pkt->msg_id, pkt->timestamp + 1);
     } else if(AVMATCH(&method, &av_FCPublish))
     {
-        send_result(rtmp, txn, pkt->msg_id, pkt->timestamp + 1);
+        send_result(r, txn, pkt->msg_id, pkt->timestamp + 1);
         AMFProp_GetString(AMF_GetProp(&obj, NULL, 3), &val);
-        send_fcpublish(rtmp, val.av_val, txn, publish, pkt->timestamp + 2);
+        send_fcpublish(r, val.av_val, txn, publish, pkt->timestamp + 2);
     } else if(AVMATCH(&method, &av_FCUnpublish))
     {
-        send_result(rtmp, txn, pkt->msg_id, pkt->timestamp + 1);
+        send_result(r, txn, pkt->msg_id, pkt->timestamp + 1);
         AMFProp_GetString(AMF_GetProp(&obj, NULL, 3), &val);
-        send_fcpublish(rtmp, val.av_val, txn, unpublish, pkt->timestamp + 2);
+        send_fcpublish(r, val.av_val, txn, unpublish, pkt->timestamp + 2);
     } else if(AVMATCH(&method, &av_createStream))
     {
         int i;
         // XXX stream ids, for some reason, *must* be >1!
         for (i = 1; i < RTMP_MAX_STREAMS; i++) {
-            if (!rtmp->streams[i]) {
+            if (!r->streams[i]) {
                 rtmp_stream *stream = malloc(sizeof(rtmp_stream));
                 if (!stream) { // TODO something drastic
                     fprintf(stderr, "Out of memory for stream!\n");
@@ -414,12 +414,12 @@ static void handle_invoke(rtmp *rtmp, rtmp_packet *pkt)
                 }
                 memset(stream, 0, sizeof(rtmp_stream));
                 stream->id = i;
-                rtmp->streams[i] = stream;
+                r->streams[i] = stream;
                 break;
             }
         }
         if (i != RTMP_MAX_STREAMS)
-            send_result(rtmp, txn, rtmp->streams[i]->id, pkt->timestamp + 1);
+            send_result(r, txn, r->streams[i]->id, pkt->timestamp + 1);
         else
             fprintf(stderr, "Maximum number of streams exceeded!\n");
     } else if(AVMATCH(&method, &av_publish))
@@ -430,7 +430,7 @@ static void handle_invoke(rtmp *rtmp, rtmp_packet *pkt)
         // command object (index 2) is always null here.
         AMFProp_GetString(AMF_GetProp(&obj, NULL, 3), &val);
         AMFProp_GetString(AMF_GetProp(&obj, NULL, 4), &type); //XXX live/recod/append
-        stream = rtmp->streams[pkt->msg_id];
+        stream = r->streams[pkt->msg_id];
         if (!stream) {
             fprintf(stderr, "Unable to publish; stream ID invalid.\n");
             return;
@@ -454,23 +454,23 @@ static void handle_invoke(rtmp *rtmp, rtmp_packet *pkt)
                 } else if (!strncmp(type.av_val, "append", 6)) {
                     stream->type = APPEND;
                 }
-        if (rtmp->publish_cb)
-            rtmp->publish_cb(rtmp, stream);
-        send_onstatus(rtmp, stream, publish, pkt->timestamp + 1);
+        if (r->publish_cb)
+            r->publish_cb(r, stream);
+        send_onstatus(r, stream, publish, pkt->timestamp + 1);
         fprintf(stdout, "publishing %s (id %d)\n",
                 stream->name, stream->id);
     } else if(AVMATCH(&method, &av_deleteStream))
     {
         int stream_id;
         stream_id = (int)AMFProp_GetNumber(AMF_GetProp(&obj, NULL, 3));
-        if (!rtmp->streams[stream_id]) {
+        if (!r->streams[stream_id]) {
             fprintf(stderr, "Unable to delete stream; invalid id %d\n", stream_id);
             return;
         }
         // TODO only for published streams
-        send_onstatus(rtmp, rtmp->streams[stream_id], unpublish, pkt->timestamp + 1);
-        if (rtmp->delete_cb) rtmp->delete_cb(rtmp, rtmp->streams[stream_id]);
-        rtmp_free_stream(&rtmp->streams[stream_id]);
+        send_onstatus(r, r->streams[stream_id], unpublish, pkt->timestamp + 1);
+        if (r->delete_cb) r->delete_cb(r, r->streams[stream_id]);
+        rtmp_free_stream(&r->streams[stream_id]);
         fprintf(stderr, "Deleting stream %d\n", stream_id);
     } else if(AVMATCH(&method, &av_play))
     {
@@ -487,19 +487,19 @@ static void handle_invoke(rtmp *rtmp, rtmp_packet *pkt)
         strncpy(streamname, val.av_val, val.av_len);
         streamname[val.av_len] = '\0';
 
-        if (rtmp->play_cb) stream = rtmp->play_cb(rtmp, streamname);
+        if (r->play_cb) stream = r->play_cb(r, streamname);
         if (!stream) return;
 
         // send allll the messages flash player requires
-        send_chunksize(rtmp, 1400, ts++); // close to MTU
+        send_chunksize(r, 1400, ts++); // close to MTU
         // XXX send streamisrecorded usercontrol message (????)
-        send_stream_begin(rtmp, stream->id, ts++);
-        send_onstatus(rtmp, stream, play, ts++);
+        send_stream_begin(r, stream->id, ts++);
+        send_onstatus(r, stream, play, ts++);
         if (reset)
-            send_onstatus(rtmp, stream, reset, ts++);
-        send_metadata(rtmp, stream);
-        if (stream->aac_seq) send_aac_seq(rtmp, stream);
-        if (stream->avc_seq) send_avc_seq(rtmp, stream);
+            send_onstatus(r, stream, reset, ts++);
+        send_metadata(r, stream);
+        if (stream->aac_seq) send_aac_seq(r, stream);
+        if (stream->avc_seq) send_avc_seq(r, stream);
 
         fprintf(stderr, "Playing video %s\n", streamname);
         free(streamname);
