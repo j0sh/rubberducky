@@ -116,7 +116,7 @@ static void free_client(client_ctx *client)
         }
 
     rtmp_free(&c->rtmp);
-    if (c->recvs) free(c->recvs);
+    if (c->outgoing) free(c->outgoing);
     ev_io_stop(ctx->loop, &c->read_watcher);
     free(c);
     ctx->connections--;
@@ -177,7 +177,7 @@ static void rd_rtmp_publish_cb(rtmp *r, rtmp_stream *stream)
     recvs->stream = stream;
     recvs->max_recvs = MAX_CLIENTS;
     recvs->list = (rtmp**)(recvs + 1);
-    client->recvs = recvs;
+    client->outgoing = recvs;
 
     rxt_put(stream->name, client, srv->streams);
 #undef MAX_CLIENTS
@@ -195,7 +195,7 @@ static rtmp_stream* rd_rtmp_play_cb(rtmp *r, char *stream_name)
         errstr = "Couldn not find client!\n";
         goto play_fail;
     }
-    recvs = client->recvs;
+    recvs = client->outgoing;
     if (!recvs) {
         errstr = "Could not find recvs!\n";
         goto play_fail;
@@ -230,7 +230,7 @@ static void rd_rtmp_read_cb(rtmp *r, rtmp_packet *pkt)
 {
     if (pkt->msg_type == 0x08 || pkt->msg_type == 0x09) {
     client_ctx *client = get_client(r);
-    recv_ctx *recv = client->recvs;
+    recv_ctx *recv = client->outgoing;
     int i, j;
     if (!recv) return;
 
@@ -291,7 +291,7 @@ static void incoming_cb(struct ev_loop *loop, ev_io *io, int revents)
     ctx->connections++;
     client->srv = ctx;
     client->id = ctx->total_cxns++;
-    client->recvs = NULL;
+    client->outgoing = NULL;
 
     rtmp_init(&client->rtmp);
     client->rtmp.fd = clientfd;
