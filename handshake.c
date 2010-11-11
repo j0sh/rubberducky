@@ -160,7 +160,7 @@ static int init_handshake(rtmp *r)
         memset(out, 0, sizeof(rtmp_packet));
         out->alloc_size = out->size = read_size;
         out->body = malloc(read_size);
-        if (!out->body) return RTMPERR(ENOMEM);
+        if (!out->body){ free(out); return RTMPERR(ENOMEM); }
         r->out_channels[0] = out;
     }
     b = out->body;
@@ -173,7 +173,7 @@ static int init_handshake(rtmp *r)
         memset(pkt, 0, sizeof(rtmp_packet));
         pkt->alloc_size = pkt->size = read_size;
         pkt->body = malloc(read_size);
-        if (!pkt->body) return RTMPERR(ENOMEM);
+        if (!pkt->body){ free(pkt); return RTMPERR(ENOMEM); }
         r->in_channels[0] = pkt;
     }
     p = pkt->body;
