@@ -28,7 +28,7 @@ struct srv_ctx;
 
 typedef struct client_ctx {
     int id;
-    rtmp rtmp;
+    rtmp rtmp_handle;
     recv_ctx *outgoing;
     ev_io read_watcher;
     struct srv_ctx *srv;

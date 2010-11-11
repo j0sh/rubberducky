@@ -109,13 +109,15 @@ static void free_client(client_ctx *client)
 
     // free streams in the server tree
     // XXX this only works for publishers; fix for listeners.
-    for (i = 0; i < RTMP_MAX_STREAMS; i++)
-        if (c->rtmp.streams[i] && c->rtmp.streams[i]->name) {
-            printf("Deleting stream %s\n", c->rtmp.streams[i]->name);
-            rxt_delete(c->rtmp.streams[i]->name, ctx->streams);
+    for (i = 0; i < RTMP_MAX_STREAMS; i++) {
+        rtmp_stream *s = c->rtmp_handle.streams[i];
+        if (s && s->name) {
+            printf("Deleting stream %s\n", s->name);
+            rxt_delete(s->name, ctx->streams);
         }
+    }
 
-    rtmp_free(&c->rtmp);
+    rtmp_free(&c->rtmp_handle);
     if (c->outgoing) free(c->outgoing);
     ev_io_stop(ctx->loop, &c->read_watcher);
     free(c);
@@ -151,7 +153,7 @@ static void close_cb(struct ev_loop *loop, ev_signal *signal, int revents)
 
 static inline client_ctx* get_client(rtmp *r)
 {
-    return (client_ctx*)((uint8_t*)r - offsetof(client_ctx, rtmp));
+    return (client_ctx*)((uint8_t*)r - offsetof(client_ctx, rtmp_handle));
 }
 
 static void rd_rtmp_close_cb(rtmp *r)
@@ -293,19 +295,19 @@ static void incoming_cb(struct ev_loop *loop, ev_io *io, int revents)
     client->id = ctx->total_cxns++;
     client->outgoing = NULL;
 
-    rtmp_init(&client->rtmp);
-    client->rtmp.fd = clientfd;
-    client->read_watcher.data = &client->rtmp;
-    client->rtmp.close_cb = rd_rtmp_close_cb;
-    client->rtmp.publish_cb = rd_rtmp_publish_cb;
-    client->rtmp.delete_cb = rd_rtmp_delete_cb;
-    client->rtmp.play_cb = rd_rtmp_play_cb;
-    client->rtmp.read_cb = rd_rtmp_read_cb;
+    rtmp_init(&client->rtmp_handle);
+    client->rtmp_handle.fd = clientfd;
+    client->read_watcher.data = &client->rtmp_handle;
+    client->rtmp_handle.close_cb = rd_rtmp_close_cb;
+    client->rtmp_handle.publish_cb = rd_rtmp_publish_cb;
+    client->rtmp_handle.delete_cb = rd_rtmp_delete_cb;
+    client->rtmp_handle.play_cb = rd_rtmp_play_cb;
+    client->rtmp_handle.read_cb = rd_rtmp_read_cb;
 
     fcntl(clientfd, F_SETFL, O_NONBLOCK);
 
     /* setup the events */
-    ev_io_init(&client->read_watcher, rtmp_read, client->rtmp.fd, EV_READ);
+    ev_io_init(&client->read_watcher, rtmp_read, client->rtmp_handle.fd, EV_READ);
     ev_io_start(ctx->loop, &client->read_watcher);
 
     // we can convert this to a readable hostname later
