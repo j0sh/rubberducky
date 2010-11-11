@@ -286,6 +286,7 @@ static void parse_metadata(rtmp *r, rtmp_packet *pkt, int offset)
     AMFProp_GetObject(AMF_GetProp(&metadata, NULL, 0), &metaobjs); //ugh
     stream->vcodec = (int)amf_read_dbl_kv(&metaobjs, "videocodecid");
     stream->acodec = (int)amf_read_dbl_kv(&metaobjs, "audiocodecid");
+    AMF_Reset(&metadata);
 }
 
 static void handle_notify(rtmp *r, rtmp_packet *pkt)
