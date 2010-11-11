@@ -4,6 +4,7 @@
 #include <stddef.h>
 #include <stdlib.h>
 #include <string.h>
+#include <assert.h>
 
 #include <sys/types.h>
 #include <sys/socket.h>
@@ -91,6 +92,11 @@ fail:
     return -errno;
 }
 
+static inline client_ctx* get_client(rtmp *r)
+{
+    return (client_ctx*)((uint8_t*)r - offsetof(client_ctx, rtmp_handle));
+}
+
 static void free_client(client_ctx *client)
 {
     int i;
@@ -108,13 +114,37 @@ static void free_client(client_ctx *client)
     fprintf(stdout, "(%d) Disconnecting\n", c->id);
 
     // free streams in the server tree
-    // XXX this only works for publishers; fix for listeners.
     for (i = 0; i < RTMP_MAX_STREAMS; i++) {
         rtmp_stream *s = c->rtmp_handle.streams[i];
         if (s && s->name) {
             printf("Deleting stream %s\n", s->name);
             rxt_delete(s->name, ctx->streams);
         }
+    }
+
+    // if sending, make sure recipients know they're off the send list
+    if (c->outgoing) {
+        int i;
+        for (i = 0; i < c->outgoing->max_recvs; i++) {
+            if (c->outgoing->list[i]) {
+                client_ctx *listener = get_client(c->outgoing->list[i]);
+                assert(listener->incoming == c->outgoing);
+                listener->incoming = NULL;
+                c->outgoing->nb_recvs--;
+            }
+        }
+        assert(!c->outgoing->nb_recvs);
+    }
+
+    // if listening, remove from stream send list
+    if (c->incoming) {
+        int i;
+        for (i = 0; i < c->incoming->max_recvs; i++)
+            if (c->incoming->list[i] == &(c->rtmp_handle)) {
+                c->incoming->list[i] = NULL;
+                c->incoming->nb_recvs--;
+                break;
+            }
     }
 
     rtmp_free(&c->rtmp_handle);
@@ -149,11 +179,6 @@ static void free_all(srv_ctx *ctx)
 static void close_cb(struct ev_loop *loop, ev_signal *signal, int revents)
 {
     free_all((srv_ctx*)signal->data);
-}
-
-static inline client_ctx* get_client(rtmp *r)
-{
-    return (client_ctx*)((uint8_t*)r - offsetof(client_ctx, rtmp_handle));
 }
 
 static void rd_rtmp_close_cb(rtmp *r)
@@ -198,6 +223,7 @@ static rtmp_stream* rd_rtmp_play_cb(rtmp *r, char *stream_name)
         goto play_fail;
     }
     recvs = client->outgoing;
+    listener->incoming = recvs;
     if (!recvs) {
         errstr = "Could not find recvs!\n";
         goto play_fail;
@@ -293,7 +319,7 @@ static void incoming_cb(struct ev_loop *loop, ev_io *io, int revents)
     ctx->connections++;
     client->srv = ctx;
     client->id = ctx->total_cxns++;
-    client->outgoing = NULL;
+    client->incoming = client->outgoing = NULL;
 
     rtmp_init(&client->rtmp_handle);
     client->rtmp_handle.fd = clientfd;
