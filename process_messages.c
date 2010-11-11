@@ -467,8 +467,12 @@ static void handle_invoke(rtmp *r, rtmp_packet *pkt)
             fprintf(stderr, "Unable to delete stream; invalid id %d\n", stream_id);
             return;
         }
-        // TODO only for published streams
-        send_onstatus(r, r->streams[stream_id], unpublish, pkt->timestamp + 1);
+
+        // here we use the stream name to signal whether it is published
+        // XXX doing this in a more semantically correct way would be nice
+        if (r->streams[stream_id]->name)
+            send_onstatus(r, r->streams[stream_id], unpublish,
+                          pkt->timestamp + 1);
         if (r->delete_cb) r->delete_cb(r, r->streams[stream_id]);
         rtmp_free_stream(&r->streams[stream_id]);
         fprintf(stderr, "Deleting stream %d\n", stream_id);
