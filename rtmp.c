@@ -602,11 +602,11 @@ void rtmp_read(struct ev_loop *loop, ev_io *io, int revents)
     switch (r->state) {
     case UNINIT:
         bytes_read = init_handshake(get_rtmp(io));
-        if (RTMPERR(EAGAIN) != bytes_read) r->state = HANDSHAKE;
+        if (1 == bytes_read) r->state = HANDSHAKE;
         break;
     case HANDSHAKE:
         bytes_read = handshake2(io);
-        if (RTMPERR(EAGAIN) != bytes_read) r->state = READ;
+        if (1 == bytes_read) r->state = READ;
         break;
     case READ:
         bytes_read = process_packet(io);

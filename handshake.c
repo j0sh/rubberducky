@@ -178,6 +178,7 @@ static int init_handshake(rtmp *r)
     }
     p = pkt->body;
 
+    read_size -= pkt->read;
     if ((len = read_bytes(r, p + pkt->read, read_size)) <= 0)
         return RTMPERR(errno);
     pkt->read += len;
@@ -271,7 +272,7 @@ static int init_handshake(rtmp *r)
 static int handshake2(ev_io *io)
 {
     rtmp *r = get_rtmp(io);
-    int len;
+    int len, read_size;
     rtmp_packet *pkt = r->in_channels[0], *out = r->out_channels[0];
     uint8_t *p = pkt->body, *pe;
 
@@ -281,7 +282,8 @@ static int handshake2(ev_io *io)
         return RTMPERR(INVALIDDATA);
     }
 
-    if ((len = read_bytes(r, p + pkt->read, RTMP_SIG_SIZE)) <= 0)
+    read_size = pkt->size - pkt->read - 1; // RTMP_SIG_SIZE only
+    if ((len = read_bytes(r, p + pkt->read, read_size)) <= 0)
         return RTMPERR(errno);
     pkt->read += len;
     pe  = p + pkt->read;
