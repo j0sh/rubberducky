@@ -503,7 +503,7 @@ static void handle_invoke(rtmp *r, rtmp_packet *pkt)
         send_onstatus(r, stream, play, ts++);
         if (reset)
             send_onstatus(r, stream, reset, ts++);
-        send_metadata(r, stream);
+        if (stream->metadata) send_metadata(r, stream);
         if (stream->aac_seq) send_aac_seq(r, stream);
         if (stream->avc_seq) send_avc_seq(r, stream);
 
