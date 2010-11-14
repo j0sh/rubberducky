@@ -291,19 +291,24 @@ static void parse_metadata(rtmp *r, rtmp_packet *pkt, int offset)
 
 static void handle_notify(rtmp *r, rtmp_packet *pkt)
 {
+    // XXX hack for leading whitespace in 0x0f messages
+    uint8_t *body = pkt->body;
+    int size = pkt->size, offset = 0;
+    while (!*body) { body++; size--; offset++; }
+
     if (!memcmp("\x02\x00\x0d@setDataFrame\x02\x00\x0aonMetaData",
-                (char*)pkt->body, 29)) {
+                (char*)body, 29)) {
         rtmp_stream *s = r->streams[pkt->msg_id];
-        int size = pkt->size - 16;
+        size -= 16; // skip @setDataFrame only
         s->metadata = malloc(RTMP_MAX_HEADER_SIZE + size + 1);
         if (!s->metadata) {
             fprintf(stderr, "Out of memory for metadata!\n");
             return;
         }
-        memcpy(s->metadata + RTMP_MAX_HEADER_SIZE, pkt->body + 16, size);
+        memcpy(s->metadata + RTMP_MAX_HEADER_SIZE, body + 16, size);
         s->metadata[RTMP_MAX_HEADER_SIZE + size] = '\0';
         s->metadata_size = size;
-        parse_metadata(r, pkt, 29);
+        parse_metadata(r, pkt, 29 + offset);
     } else
         fprintf(stdout, "Unhandled metadata!\n");
 }
@@ -383,6 +388,7 @@ static int handle_msg(rtmp *r, struct rtmp_packet *pkt, ev_io *io)
     case 0x09: // video
         handle_video(r, pkt);
         break;
+    case 0x0f: // flex stream (HACK)
     case 0x12:
         handle_notify(r, pkt);
         break;
