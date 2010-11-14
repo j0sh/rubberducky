@@ -424,7 +424,7 @@ static void handle_invoke(rtmp *r, rtmp_packet *pkt)
             fprintf(stderr, "Maximum number of streams exceeded!\n");
     } else if(AVMATCH(&method, &av_publish))
     {
-        AVal type;
+        AVal type = {0, 0};
         rtmp_stream *stream;
         // transaction id (index 1) is always zero here,
         // command object (index 2) is always null here.
@@ -447,6 +447,7 @@ static void handle_invoke(rtmp *r, rtmp_packet *pkt)
                 // use strncmp variant because the type is not likely to
                 // be null-terminated, so avoid a 1-byte overread. Note
                 // the type is usually the last element in the packet body
+                if (!type.av_len) goto pub;
                 if (!strncmp(type.av_val, "live", 4)) {
                     stream->type = LIVE;
                 } else if (!strncmp(type.av_val, "record", 6)) {
@@ -454,6 +455,7 @@ static void handle_invoke(rtmp *r, rtmp_packet *pkt)
                 } else if (!strncmp(type.av_val, "append", 6)) {
                     stream->type = APPEND;
                 }
+        pub:
         if (r->publish_cb)
             r->publish_cb(r, stream);
         send_onstatus(r, stream, publish, pkt->timestamp + 1);
