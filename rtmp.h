@@ -64,6 +64,8 @@ typedef struct rtmp_packet {
     chunk_types chunk_type;
     uint8_t *body;
     int alloc_size; // amount allocated for body (size <= alloc_size)
+    uint8_t header[RTMP_MAX_HEADER_SIZE];
+    int header_size;
  }rtmp_packet;
 
 typedef struct rtmp_stream {

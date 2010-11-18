@@ -272,14 +272,11 @@ static void rd_rtmp_read_cb(rtmp *r, rtmp_packet *pkt)
                 return;
             }
 
-            // memcpy every packet and body for each client? VOMIT
+            // memcpy every packet for each client? VOMIT
             rtmp_packet packet;
-            uint8_t *body = malloc(pkt->size + RTMP_MAX_HEADER_SIZE);
             memcpy(&packet, pkt, sizeof(rtmp_packet));
-            memcpy(body+RTMP_MAX_HEADER_SIZE, pkt->body, pkt->size);
-            packet.body = body+RTMP_MAX_HEADER_SIZE;
+            packet.body = pkt->body;
             rtmp_send(recv->list[i], &packet);
-            free(body);
             j++;
         }
     }

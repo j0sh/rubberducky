@@ -39,13 +39,12 @@ SAVC(play);
 
 static int send_result(rtmp *rtmp, double txn, double stream_id, int ts)
 {
-    uint8_t pbuf[128], *end = pbuf+sizeof(pbuf), *enc = pbuf+RTMP_MAX_HEADER_SIZE, *foo;
-    memset(pbuf, 0, RTMP_MAX_HEADER_SIZE);
+    uint8_t pbuf[128], *end = pbuf+sizeof(pbuf), *enc = pbuf, *foo;
     enc = amf_write_str(enc, end, "_result");
     enc = amf_write_dbl(enc, end, txn);
     *enc++ = AMF_NULL; //command object
     enc = amf_write_dbl(enc, end, stream_id); // IS THIS A HEADER?!?
-    foo = pbuf+RTMP_MAX_HEADER_SIZE;
+    foo = pbuf;
     rtmp_packet packet = {
         .chunk_id = 0x03,
         .msg_type = 0x14,
@@ -59,13 +58,11 @@ static int send_result(rtmp *rtmp, double txn, double stream_id, int ts)
 
 static int send_onbw_done(rtmp *rtmp, int ts)
 {
-    // i have never actually seen a flash client make use of this.
-    uint8_t pbuf[128], *end = pbuf+sizeof(pbuf), *enc = pbuf+RTMP_MAX_HEADER_SIZE, *foo;
-    memset(pbuf, 0, RTMP_MAX_HEADER_SIZE); // to shut up valgrind
+    uint8_t pbuf[128], *end = pbuf+sizeof(pbuf), *enc = pbuf, *foo;
     enc = amf_write_str(enc, end, "onBWDone");
     enc = amf_write_dbl(enc, end, 0);
     *enc++ = AMF_NULL; // command object
-    foo = pbuf+RTMP_MAX_HEADER_SIZE;
+    foo = pbuf;
     rtmp_packet packet = {
         .chunk_id = 0x03,
         .msg_type = 0x14,
@@ -80,8 +77,7 @@ static int send_onbw_done(rtmp *rtmp, int ts)
 static int send_cxn_resp(rtmp *rtmp, double txn, int ts)
 {
     rtmp_packet packet;
-  uint8_t pbuf[384], *pend = pbuf+sizeof(pbuf), *enc;
-    memset(pbuf, 0, RTMP_MAX_HEADER_SIZE);
+    uint8_t pbuf[384], *pend = pbuf+sizeof(pbuf), *enc;
   AMFObject obj;
   AMFObjectProperty p, op;
 
@@ -89,7 +85,7 @@ static int send_cxn_resp(rtmp *rtmp, double txn, int ts)
     packet.msg_type = 0x14;
     packet.msg_id = 0;
     packet.timestamp = ts;
-    packet.body = enc = pbuf + RTMP_MAX_HEADER_SIZE;
+    packet.body = enc = pbuf;
 
   enc = amf_write_str(enc, pend, "_result");
   enc = amf_write_dbl(enc, pend, txn);
@@ -129,8 +125,7 @@ typedef enum {publish = 0, unpublish, play, reset} stream_cmd;
 static int send_fcpublish(rtmp *rtmp, const char *streamname,
                           double txn, stream_cmd action, int ts)
 {
-    uint8_t pbuf[256], *end = pbuf+sizeof(pbuf), *enc = pbuf+RTMP_MAX_HEADER_SIZE, *foo;
-    memset(pbuf, 0, RTMP_MAX_HEADER_SIZE);
+    uint8_t pbuf[256], *end = pbuf+sizeof(pbuf), *enc = pbuf, *foo;
     const char *key, *value;
     switch (action) {
     case publish:
@@ -156,7 +151,7 @@ static int send_fcpublish(rtmp *rtmp, const char *streamname,
     *enc++ = 0;
     *enc++ = AMF_OBJECT_END;
 
-    foo = pbuf+RTMP_MAX_HEADER_SIZE;
+    foo = pbuf;
     rtmp_packet packet = {
         .chunk_id = 0x03,
         .msg_type = 0x14,
@@ -172,9 +167,8 @@ static int send_fcpublish(rtmp *rtmp, const char *streamname,
 static int send_onstatus(rtmp *r, rtmp_stream *s,
                          stream_cmd action, int ts)
 {
-    uint8_t pbuf[256], *end = pbuf+sizeof(pbuf), *enc = pbuf+RTMP_MAX_HEADER_SIZE, *foo;
+    uint8_t pbuf[256], *end = pbuf+sizeof(pbuf), *enc = pbuf, *foo;
     char tbuf[64], pubstr[64]; //XXX this might not be enough later on
-    memset(pbuf, 0, RTMP_MAX_HEADER_SIZE);
     enc = amf_write_str(enc, end, "onStatus");
     enc = amf_write_dbl(enc, end, 0); // transaction id
     *enc++ = AMF_NULL; // command object
@@ -212,7 +206,7 @@ static int send_onstatus(rtmp *r, rtmp_stream *s,
     *enc++ = 0;
     *enc++ = AMF_OBJECT_END;
 
-    foo = pbuf+RTMP_MAX_HEADER_SIZE;
+    foo = pbuf;
     rtmp_packet packet = {
         .chunk_id = 0x04,
         .msg_type = 0x14,
@@ -304,7 +298,7 @@ static void handle_connect(rtmp *rtmp, rtmp_packet *pkt, AMFObject *obj)
 
 static int send_avc_seq(rtmp *r, rtmp_stream *stream)
 {
-    uint8_t *body = stream->avc_seq + RTMP_MAX_HEADER_SIZE;
+    uint8_t *body = stream->avc_seq;
     int size = stream->avc_seq_size;
     rtmp_packet packet = {
         .chunk_id  = 0x04,
@@ -320,7 +314,7 @@ static int send_avc_seq(rtmp *r, rtmp_stream *stream)
 
 static int send_aac_seq(rtmp *r, rtmp_stream *stream)
 {
-    uint8_t *body = stream->aac_seq + RTMP_MAX_HEADER_SIZE;
+    uint8_t *body = stream->aac_seq;
     int size = stream->aac_seq_size;
     rtmp_packet packet = {
         .chunk_id  = 0x04,
@@ -336,7 +330,7 @@ static int send_aac_seq(rtmp *r, rtmp_stream *stream)
 
 static int send_metadata(rtmp *r, rtmp_stream *stream)
 {
-    uint8_t *body = stream->metadata + RTMP_MAX_HEADER_SIZE;
+    uint8_t *body = stream->metadata;
     int size = stream->metadata_size;
     rtmp_packet packet = {
         .chunk_id = 0x04,

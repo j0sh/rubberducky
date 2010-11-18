@@ -32,9 +32,8 @@ static inline rtmp* get_rtmp(ev_io *w)
 
 static int send_chunksize(rtmp *r, int chunksize, int ts)
 {
-    uint8_t pbuf[RTMP_MAX_HEADER_SIZE + 4] = { 0 };
-    uint8_t *body = pbuf + RTMP_MAX_HEADER_SIZE,
-            *end = pbuf + sizeof(pbuf);
+    uint8_t pbuf[4];
+    uint8_t *body = pbuf, *end = pbuf + sizeof(pbuf);
     rtmp_packet packet = {
         .chunk_id = 0x02,
         .msg_id = 0,
@@ -51,9 +50,8 @@ static int send_chunksize(rtmp *r, int chunksize, int ts)
 
 static int send_ack(rtmp *r, int ts)
 {
-    uint8_t pbuf[RTMP_MAX_HEADER_SIZE + 4] = { 0 };
-    uint8_t *body = pbuf + RTMP_MAX_HEADER_SIZE,
-            *end = pbuf + sizeof(pbuf);
+    uint8_t pbuf[4];
+    uint8_t *body = pbuf, *end = pbuf + sizeof(pbuf);
     rtmp_packet packet = {
         .chunk_id  = 0x02,
         .msg_id    = 0,
@@ -71,9 +69,8 @@ static int send_ack(rtmp *r, int ts)
 
 static int send_usercontrol(rtmp *r, int msg, int data, int ts)
 {
-    uint8_t pbuf[RTMP_MAX_HEADER_SIZE + 6] = { 0 };
-    uint8_t *body = pbuf + RTMP_MAX_HEADER_SIZE,
-            *end = pbuf + sizeof(pbuf);
+    uint8_t pbuf[6];
+    uint8_t *body = pbuf, *end = pbuf + sizeof(pbuf);
     rtmp_packet packet = {
         .chunk_id  = 0x02,
         .msg_id    = 0,
@@ -123,8 +120,8 @@ static inline int send_pong(rtmp *r, uint32_t ping_t, int ts)
 static videoapi_unused int send_buflen(rtmp *r, int stream_id, int ts)
 {
 #define BUFLEN 3000
-    uint8_t pbuf[RTMP_MAX_HEADER_SIZE + 10] = {0},
-    *body = pbuf + RTMP_MAX_HEADER_SIZE, *end = pbuf + sizeof(pbuf);
+    uint8_t pbuf[10];
+    uint8_t *body = pbuf, *end = pbuf + sizeof(pbuf);
     rtmp_packet packet = {
         .chunk_id  = 0x02,
         .msg_id    = 0,
@@ -148,17 +145,17 @@ static videoapi_unused int send_buflen(rtmp *r, int stream_id, int ts)
 
 static int send_ack_size(rtmp *r, int ts)
 {
-    uint8_t pbuf[RTMP_MAX_HEADER_SIZE + 4] = { 0 };
+    uint8_t pbuf[4];
     rtmp_packet packet = {
         .chunk_id = 0x02,
         .msg_id   = 0,
         .msg_type = 0x05,
         .timestamp = ts,
-        .size = sizeof(pbuf) - RTMP_MAX_HEADER_SIZE,
-        .body = pbuf + RTMP_MAX_HEADER_SIZE
+        .size = sizeof(pbuf),
+        .body = pbuf
     };
 
-    amf_write_i32(pbuf + RTMP_MAX_HEADER_SIZE, pbuf + sizeof(pbuf), r->ack_size);
+    amf_write_i32(pbuf, pbuf + sizeof(pbuf), r->ack_size);
 
     fprintf(stdout, "Sending ack window for size %d\n", r->ack_size);
     return rtmp_send(r, &packet);
@@ -166,16 +163,16 @@ static int send_ack_size(rtmp *r, int ts)
 
 static int send_peer_bw(rtmp *rtmp, int ts)
 {
-    uint8_t pbuf[RTMP_MAX_HEADER_SIZE+5] = {0};
-    amf_write_i32(pbuf + RTMP_MAX_HEADER_SIZE, pbuf + RTMP_MAX_HEADER_SIZE + 4, 0x0fffffff);
-    pbuf[RTMP_MAX_HEADER_SIZE + 4] = 2;
+    uint8_t pbuf[5];
+    amf_write_i32(pbuf, pbuf + 4, 0x0fffffff);
+    pbuf[4] = 2; // uhhh wtf? XXX review spec
     rtmp_packet packet = {
         .chunk_id = 0x02,
         .msg_id = 0,
         .msg_type = 0x06,
         .timestamp = 0,
-        .size = sizeof(pbuf) - RTMP_MAX_HEADER_SIZE,
-        .body = pbuf + RTMP_MAX_HEADER_SIZE
+        .size = sizeof(pbuf),
+        .body = pbuf
     };
     fprintf(stdout, "sending clientbw, rx: %d, tx %d\n", rtmp->rx, rtmp->tx);
     return rtmp_send(rtmp, &packet);
@@ -300,13 +297,13 @@ static void handle_notify(rtmp *r, rtmp_packet *pkt)
                 (char*)body, 29)) {
         rtmp_stream *s = r->streams[pkt->msg_id];
         size -= 16; // skip @setDataFrame only
-        s->metadata = malloc(RTMP_MAX_HEADER_SIZE + size + 1);
+        s->metadata = malloc(size + 1);
         if (!s->metadata) {
             fprintf(stderr, "Out of memory for metadata!\n");
             return;
         }
-        memcpy(s->metadata + RTMP_MAX_HEADER_SIZE, body + 16, size);
-        s->metadata[RTMP_MAX_HEADER_SIZE + size] = '\0';
+        memcpy(s->metadata, body + 16, size);
+        s->metadata[size] = '\0';
         s->metadata_size = size;
         parse_metadata(r, pkt, 29 + offset);
     } else
@@ -317,12 +314,12 @@ static void handle_audio(rtmp *r, rtmp_packet *pkt)
 {
     // intercept the AAC sequence header and cache it
     if (10 == (pkt->body[0] >> 4) && !pkt->body[1]) {
-        uint8_t *cache = malloc(pkt->size + RTMP_MAX_HEADER_SIZE);
+        uint8_t *cache = malloc(pkt->size);
         if (!cache) {
             fprintf(stderr, "Out of memory for AAC cache!\n");
             return;
         }
-        memcpy(cache + RTMP_MAX_HEADER_SIZE, pkt->body, pkt->size);
+        memcpy(cache, pkt->body, pkt->size);
         if (r->streams[pkt->msg_id]->aac_seq) {
             // AFAIK this should not really happen as the AAC sequence
             // is only really stored at the beginning of the stream
@@ -339,12 +336,12 @@ static void handle_video(rtmp *r, rtmp_packet *pkt)
 {
     // intercept the AVC sequence header and cache it
     if (7 == (pkt->body[0] & 0x0f) && !pkt->body[1]) {
-        uint8_t *cache = malloc(pkt->size + RTMP_MAX_HEADER_SIZE);
+        uint8_t *cache = malloc(pkt->size);
         if (!cache) {
             fprintf(stderr, "Out of memory for AVC cache!\n");
             return;
         }
-        memcpy(cache + RTMP_MAX_HEADER_SIZE, pkt->body, pkt->size);
+        memcpy(cache, pkt->body, pkt->size);
         if (r->streams[pkt->msg_id]->avc_seq) {
             // AVC sequence is only really stored at stream start
             fprintf(stderr, "Warning: removing previous AVC sequence.\n");

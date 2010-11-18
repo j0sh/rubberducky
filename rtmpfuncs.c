@@ -6,7 +6,7 @@
 #include <stdint.h>
 #include <stdio.h>
 
-#include <sys/socket.h>
+#include <sys/uio.h> // iovec
 #include <unistd.h>
 
 void rtmp_init(rtmp *r)
@@ -75,7 +75,7 @@ static inline int write_i32_le(uint8_t *buf, uint8_t *end, int n)
 int rtmp_send(rtmp *r, rtmp_packet *pkt) {
     rtmp_packet *prev = r->out_channels[pkt->chunk_id];
     uint32_t ts;
-    uint8_t *header, *start, *body;
+    uint8_t *header, *body;
     int header_size, chunk_header_size, chunk_size, to_write;
 
     pkt->chunk_type = CHUNK_LARGE;
@@ -114,15 +114,8 @@ int rtmp_send(rtmp *r, rtmp_packet *pkt) {
 
     ts = CHUNK_LARGE == pkt->chunk_type ? pkt->timestamp : pkt->ts_delta;
 
-    if (ts >= 0xffffff) {
-        header_size += 4;
-        // just write the extended timestamp now
-        amf_write_i32(pkt->body - 4, pkt->body, ts);
-    }
 
-    // XXX make sure there is room behind the packet body!
-    header     = pkt->body - header_size - chunk_header_size;
-    start      = header;
+    header     = pkt->header;
     body       = pkt->body;
     to_write   = pkt->size;
     chunk_size = r->out_chunk_size;
@@ -142,13 +135,19 @@ int rtmp_send(rtmp *r, rtmp_packet *pkt) {
     }
     header += header_size;
 
+    if (ts >= 0xffffff) {
+        // extended timestamp
+        amf_write_i32(header, pkt->header + RTMP_MAX_HEADER_SIZE, ts);
+        header_size += 4;
+    }
+    header_size += chunk_header_size;
     while (to_write) {
         if (to_write < chunk_size)
             chunk_size = to_write;
 
         // encode chunk header
         // XXX bencmark this fragment against librtmp
-        header = start;
+        header = pkt->header;
         *header = (pkt->chunk_type << 6);
         switch (chunk_header_size) {
         case 1:
@@ -161,13 +160,15 @@ int rtmp_send(rtmp *r, rtmp_packet *pkt) {
             header[1] = (pkt->chunk_id - 64) & 0xff;
         }
 
-        // start includes headers, body comes after headers
-        send(r->fd, start, body + chunk_size - start, 0);
+        struct iovec vectors[2] = { {header, header_size},
+                                    {body, chunk_size}};
+        writev(r->fd, vectors, 2);
 
         // reset stuff
+        r->tx    += header_size;
         to_write -= chunk_size;
         body     += chunk_size;
-        start     = body - chunk_header_size;
+        header_size = chunk_header_size;
         pkt->chunk_type = CHUNK_TINY;
     }
 
@@ -183,8 +184,8 @@ int rtmp_send(rtmp *r, rtmp_packet *pkt) {
     if (CHUNK_LARGE == pkt->chunk_type)
         r->out_channels[pkt->chunk_id]->ts_delta = pkt->timestamp;
     r->out_channels[pkt->chunk_id]->body = NULL; // dont store for outbound
-    r->tx += chunk_header_size + header_size + to_write;
-    return chunk_header_size + header_size + to_write;
+    r->tx += pkt->size;
+    return 1;
 
 send_error:
     return -1; //XXX do something drastic
