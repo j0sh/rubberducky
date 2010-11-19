@@ -121,18 +121,18 @@ static int send_cxn_resp(rtmp *rtmp, double txn, int ts)
     return rtmp_send(rtmp, &packet);
 }
 
-typedef enum {publish = 0, unpublish, play, reset} stream_cmd;
+typedef enum {PUBLISH = 0, UNPUBLISH, PLAY, RESET} stream_cmd;
 static int send_fcpublish(rtmp *rtmp, const char *streamname,
                           double txn, stream_cmd action, int ts)
 {
     uint8_t pbuf[256], *end = pbuf+sizeof(pbuf), *enc = pbuf, *foo;
     const char *key, *value;
     switch (action) {
-    case publish:
+    case PUBLISH:
         key = "onFCPublish";
         value = "NetStream.Publish.Start";
         break;
-    case unpublish:
+    case UNPUBLISH:
         key = "onFCUnpublish";
         value = "NetStream.Unpublish.Success";
         break;
@@ -175,23 +175,24 @@ static int send_onstatus(rtmp *r, rtmp_stream *s,
 
     // TODO checks to enforce string bounds here (and everywhere else)
     switch(action) {
-    case publish:
+    case PUBLISH:
         strncpy(pubstr, "NetStream.Publish.Start", sizeof(pubstr));
         snprintf(tbuf, sizeof(tbuf), "%s is now published.", s->name);
         break;
-    case unpublish:
+    case UNPUBLISH:
         strncpy(pubstr, "NetStream.Unpublish.Success", sizeof(pubstr));
         snprintf(tbuf, sizeof(tbuf), "%s is now unpublished.", s->name);
         break;
-    case play:
+    case PLAY:
         //XXX this state really should be 'play pending' or something
         //TODO send PlayPublishNotify when actually ready to play
         strncpy(pubstr, "NetStream.Play.Start", sizeof(pubstr));
         snprintf(tbuf, sizeof(tbuf), "%s is now published.", s->name);
         break;
-    case reset:
+    case RESET:
         strncpy(pubstr, "NetStream.Play.Reset", sizeof(pubstr));
         snprintf(tbuf, sizeof(tbuf), "Playing and resetting %s.", s->name);
+        break;
     default:
         strncpy(pubstr, "oops", sizeof(pubstr));
     }
@@ -389,12 +390,12 @@ static void handle_invoke(rtmp *r, rtmp_packet *pkt)
     {
         send_result(r, txn, pkt->msg_id, pkt->timestamp + 1);
         AMFProp_GetString(AMF_GetProp(&obj, NULL, 3), &val);
-        send_fcpublish(r, val.av_val, txn, publish, pkt->timestamp + 2);
+        send_fcpublish(r, val.av_val, txn, PUBLISH, pkt->timestamp + 2);
     } else if(AVMATCH(&method, &av_FCUnpublish))
     {
         send_result(r, txn, pkt->msg_id, pkt->timestamp + 1);
         AMFProp_GetString(AMF_GetProp(&obj, NULL, 3), &val);
-        send_fcpublish(r, val.av_val, txn, unpublish, pkt->timestamp + 2);
+        send_fcpublish(r, val.av_val, txn, UNPUBLISH, pkt->timestamp + 2);
     } else if(AVMATCH(&method, &av_createStream))
     {
         int i;
@@ -451,7 +452,7 @@ static void handle_invoke(rtmp *r, rtmp_packet *pkt)
 
         if (r->publish_cb)
             r->publish_cb(r, stream);
-        send_onstatus(r, stream, publish, pkt->timestamp + 1);
+        send_onstatus(r, stream, PUBLISH, pkt->timestamp + 1);
         fprintf(stdout, "publishing %s (id %d)\n",
                 stream->name, stream->id);
     } else if(AVMATCH(&method, &av_deleteStream))
@@ -465,7 +466,7 @@ static void handle_invoke(rtmp *r, rtmp_packet *pkt)
 
         // only for published streams
         if (VOD != r->streams[stream_id]->type)
-            send_onstatus(r, r->streams[stream_id], unpublish,
+            send_onstatus(r, r->streams[stream_id], UNPUBLISH,
                           pkt->timestamp + 1);
         if (r->delete_cb) r->delete_cb(r, r->streams[stream_id]);
         rtmp_free_stream(&r->streams[stream_id]);
@@ -493,9 +494,9 @@ static void handle_invoke(rtmp *r, rtmp_packet *pkt)
         send_chunksize(r, 1400, ts++); // close to MTU
         // XXX send streamisrecorded usercontrol message (????)
         send_stream_begin(r, stream->id, ts++);
-        send_onstatus(r, stream, play, ts++);
+        send_onstatus(r, stream, PLAY, ts++);
         if (reset)
-            send_onstatus(r, stream, reset, ts++);
+            send_onstatus(r, stream, RESET, ts++);
         if (stream->metadata) send_metadata(r, stream);
         if (stream->aac_seq) send_aac_seq(r, stream);
         if (stream->avc_seq) send_avc_seq(r, stream);
