@@ -441,15 +441,14 @@ static void handle_invoke(rtmp *r, rtmp_packet *pkt)
                 // use strncmp variant because the type is not likely to
                 // be null-terminated, so avoid a 1-byte overread. Note
                 // the type is usually the last element in the packet body
-                if (!type.av_len) goto pub;
-                if (!strncmp(type.av_val, "live", 4)) {
+                if (!type.av_len || !strncmp(type.av_val, "live", 4)) {
                     stream->type = LIVE;
                 } else if (!strncmp(type.av_val, "record", 6)) {
                     stream->type = RECORD;
                 } else if (!strncmp(type.av_val, "append", 6)) {
                     stream->type = APPEND;
                 }
-        pub:
+
         if (r->publish_cb)
             r->publish_cb(r, stream);
         send_onstatus(r, stream, publish, pkt->timestamp + 1);
@@ -464,9 +463,8 @@ static void handle_invoke(rtmp *r, rtmp_packet *pkt)
             return;
         }
 
-        // here we use the stream name to signal whether it is published
-        // XXX doing this in a more semantically correct way would be nice
-        if (r->streams[stream_id]->name)
+        // only for published streams
+        if (VOD != r->streams[stream_id]->type)
             send_onstatus(r, r->streams[stream_id], unpublish,
                           pkt->timestamp + 1);
         if (r->delete_cb) r->delete_cb(r, r->streams[stream_id]);
@@ -476,7 +474,7 @@ static void handle_invoke(rtmp *r, rtmp_packet *pkt)
     {
         char *streamname; // because val won't be null terminated
         int start, duration, reset, ts = pkt->timestamp + 1;
-        rtmp_stream *stream;
+        rtmp_stream *stream = r->streams[pkt->msg_id];
         AMFProp_GetString(AMF_GetProp(&obj, NULL, 3), &val);
         start = (int)AMFProp_GetNumber(AMF_GetProp(&obj, NULL, 4));
         duration = (int)AMFProp_GetNumber(AMF_GetProp(&obj, NULL, 5));
@@ -486,9 +484,10 @@ static void handle_invoke(rtmp *r, rtmp_packet *pkt)
         if (!streamname){ errstr = "Outta memory!"; goto invoke_error; }
         strncpy(streamname, val.av_val, val.av_len);
         streamname[val.av_len] = '\0';
+        stream->name = streamname;
 
-        if (r->play_cb) stream = r->play_cb(r, streamname);
-        if (!stream) return;
+        if (r->play_cb && !r->play_cb(r, stream))
+            return;
 
         // send allll the messages flash player requires
         send_chunksize(r, 1400, ts++); // close to MTU
@@ -502,7 +501,6 @@ static void handle_invoke(rtmp *r, rtmp_packet *pkt)
         if (stream->avc_seq) send_avc_seq(r, stream);
 
         fprintf(stderr, "Playing video %s\n", streamname);
-        free(streamname);
     }
     AMF_Reset(&obj);
 

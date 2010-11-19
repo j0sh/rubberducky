@@ -23,12 +23,14 @@ void rtmp_free_stream(rtmp_stream **stream)
     if (!s) return;
     if (s->name) free(s->name);
     s->name = NULL;
+    if (VOD != s->type) {      // XXX feels awfully leaky
     if (s->metadata) free(s->metadata);
     s->metadata = NULL;
     if (s->aac_seq) free(s->aac_seq);
     s->aac_seq = NULL;
     if (s->avc_seq) free(s->avc_seq);
     s->avc_seq = NULL;
+    }
     free(s);
     *stream = NULL;
 }

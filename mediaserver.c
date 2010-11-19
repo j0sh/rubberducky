@@ -210,11 +210,11 @@ static void rd_rtmp_publish_cb(rtmp *r, rtmp_stream *stream)
 #undef MAX_CLIENTS
 }
 
-static rtmp_stream* rd_rtmp_play_cb(rtmp *r, char *stream_name)
+static int rd_rtmp_play_cb(rtmp *r, rtmp_stream *s)
 {
     client_ctx *listener = get_client(r);
     srv_ctx *srv = listener->srv;
-    client_ctx *client = rxt_get(stream_name, srv->streams);
+    client_ctx *client = rxt_get(s->name, srv->streams);
     recv_ctx *recvs;
     const char *errstr;
     int i;
@@ -233,14 +233,22 @@ static rtmp_stream* rd_rtmp_play_cb(rtmp *r, char *stream_name)
             r->keyframe_pending = recvs->stream->vcodec == 2; // h263 only
             recvs->list[i] = r;
             recvs->nb_recvs++;
-            return recvs->stream;
+
+            // don't particularly like this bit of copying. better way?
+            s->metadata = recvs->stream->metadata;
+            s->metadata_size = recvs->stream->metadata_size;
+            s->aac_seq = recvs->stream->aac_seq;
+            s->aac_seq_size = recvs->stream->aac_seq_size;
+            s->avc_seq = recvs->stream->avc_seq;
+            s->avc_seq_size = recvs->stream->avc_seq_size;
+            return 1;
         }
 
     errstr = "Receiver list full!\n";
 
 play_fail:
     fprintf(stderr, "Error processing play request: %s\n", errstr);
-    return NULL;
+    return 0;
 }
 
 static int is_keyframe(rtmp *listener, rtmp_packet *pkt)
@@ -286,7 +294,7 @@ static void rd_rtmp_delete_cb(rtmp *r, rtmp_stream *s)
 {
     client_ctx *client = get_client(r);
     srv_ctx *srv = client->srv;
-    if (s->name)
+    if (VOD != s->type)
         rxt_delete(s->name, srv->streams);
 }
 
