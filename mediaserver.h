@@ -18,7 +18,12 @@
 #define QUOTEVALUE(x) QUOTELITERAL(x)
 
 typedef struct {
-    rtmp **list; // receivers
+    rtmp *rtmp_handle;
+    rtmp_stream *stream;
+}stream_mapping;
+
+typedef struct {
+    stream_mapping **list; // receivers
     rtmp_stream *stream;
     int nb_recvs;
     int max_recvs;

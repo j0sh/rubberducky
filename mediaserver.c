@@ -127,9 +127,11 @@ static void free_client(client_ctx *client)
         int i;
         for (i = 0; i < c->outgoing->max_recvs; i++) {
             if (c->outgoing->list[i]) {
-                client_ctx *listener = get_client(c->outgoing->list[i]);
+                client_ctx *listener = get_client(c->outgoing->list[i]->rtmp_handle);
                 assert(listener->incoming == c->outgoing);
                 listener->incoming = NULL;
+                free(c->outgoing->list[i]);
+                c->outgoing->list[i] = NULL;
                 c->outgoing->nb_recvs--;
             }
         }
@@ -140,7 +142,8 @@ static void free_client(client_ctx *client)
     if (c->incoming) {
         int i;
         for (i = 0; i < c->incoming->max_recvs; i++)
-            if (c->incoming->list[i] == &(c->rtmp_handle)) {
+            if (c->incoming->list[i]->rtmp_handle == &(c->rtmp_handle)) {
+                free(c->incoming->list[i]);
                 c->incoming->list[i] = NULL;
                 c->incoming->nb_recvs--;
                 break;
@@ -194,16 +197,16 @@ static void rd_rtmp_publish_cb(rtmp *r, rtmp_stream *stream)
     srv_ctx *srv;
 
     client = get_client(r);
-    recvs = malloc(MAX_CLIENTS * sizeof(rtmp*) + sizeof(recv_ctx));
+    recvs = malloc(MAX_CLIENTS * sizeof(stream_mapping*) + sizeof(recv_ctx));
     srv = client->srv;
     if (!recvs) {
         fprintf(stderr, "Out of memory when mallocing receivers!\n");
         return; // TODO something drastic
     }
-    memset(recvs, 0, MAX_CLIENTS * sizeof(rtmp*) + sizeof(recv_ctx));
+    memset(recvs, 0, MAX_CLIENTS * sizeof(stream_mapping*) + sizeof(recv_ctx));
     recvs->stream = stream;
     recvs->max_recvs = MAX_CLIENTS;
-    recvs->list = (rtmp**)(recvs + 1);
+    recvs->list = (stream_mapping**)(recvs + 1);
     client->outgoing = recvs;
 
     rxt_put(stream->name, client, srv->streams);
@@ -230,8 +233,15 @@ static int rd_rtmp_play_cb(rtmp *r, rtmp_stream *s)
     }
     for (i = 0; i < recvs->max_recvs; i++)
         if (!recvs->list[i]) {
+            stream_mapping *map = malloc(sizeof(stream_mapping));
+            if (!map) {
+                errstr = "ENOMEM when allocating stream map!\n";
+                goto play_fail;
+            }
+            map->rtmp_handle = r;
+            map->stream = s;
             r->keyframe_pending = recvs->stream->vcodec == 2; // h263 only
-            recvs->list[i] = r;
+            recvs->list[i] = map;
             recvs->nb_recvs++;
 
             // don't particularly like this bit of copying. better way?
@@ -272,19 +282,25 @@ static void rd_rtmp_read_cb(rtmp *r, rtmp_packet *pkt)
 
     for (i = j = 0; j < recv->nb_recvs; i++)
         if (recv->list[i]){
+            rtmp *handle = recv->list[i]->rtmp_handle;
+            rtmp_stream *s = recv->list[i]->stream;
 
             // for receiver's first packet(s), skip up to keyframe
             if (pkt->msg_type == 0x09 &&
-                recv->list[i]->keyframe_pending &&
-                !is_keyframe(recv->list[i], pkt)) {
+                handle->keyframe_pending &&
+                !is_keyframe(handle, pkt)) {
                 return;
             }
 
-            // memcpy every packet for each client? VOMIT
-            rtmp_packet packet;
-            memcpy(&packet, pkt, sizeof(rtmp_packet));
-            packet.body = pkt->body;
-            rtmp_send(recv->list[i], &packet);
+            rtmp_packet packet = {
+                .chunk_id  = s->id + 3,      // not too fond of this bit
+                .msg_type  = pkt->msg_type,
+                .msg_id    = s->id,          // should always be >=1
+                .timestamp = pkt->timestamp,
+                .body      = pkt->body,
+                .size      = pkt->size
+            };
+            rtmp_send(handle, &packet);
             j++;
         }
     }
