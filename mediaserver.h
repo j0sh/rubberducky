@@ -35,7 +35,6 @@ typedef struct client_ctx {
     int id;
     rtmp rtmp_handle;
     recv_ctx *outgoing;
-    recv_ctx *incoming;
     ev_io read_watcher;
     struct srv_ctx *srv;
     struct client_ctx *next;

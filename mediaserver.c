@@ -97,6 +97,40 @@ static inline client_ctx* get_client(rtmp *r)
     return (client_ctx*)((uint8_t*)r - offsetof(client_ctx, rtmp_handle));
 }
 
+static void remove_stream_from_list(client_ctx *client, char *stream_name)
+{
+    rtmp *r = &client->rtmp_handle;
+    srv_ctx *srv = client->srv;
+    recv_ctx *stream_source;
+    int i;
+
+    client_ctx *source_client = rxt_get(stream_name, srv->streams);
+    if (!source_client) {
+        fprintf(stderr, "Could not find client for removing stream %s!\n",
+                stream_name);
+        return;
+    }
+
+    stream_source = source_client->outgoing;
+    if (!stream_source) {
+        fprintf(stderr, "Could not find %s to remove from send list!\n", stream_name);
+        return;
+    }
+
+    for (i = 0; i < stream_source->max_recvs; i++) {
+        if (stream_source->list[i]->rtmp_handle == r) {
+            free(stream_source->list[i]); // free the mapping
+            stream_source->list[i] = NULL;
+            stream_source->nb_recvs--;
+            fprintf(stdout, "Removed %s from send list.\n", stream_name);
+            return;
+        }
+    }
+
+    fprintf(stderr, "Unable to find client in stream list for removal! "
+            "Are you sure the client ever belonged to the list?\n");
+}
+
 static void free_client(client_ctx *client)
 {
     int i;
@@ -113,45 +147,29 @@ static void free_client(client_ctx *client)
 
     fprintf(stdout, "(%d) Disconnecting\n", c->id);
 
-    // free streams in the server tree
-    for (i = 0; i < RTMP_MAX_STREAMS; i++) {
-        rtmp_stream *s = c->rtmp_handle.streams[i];
-        if (s && s->name) {
-            printf("Deleting stream %s\n", s->name);
-            rxt_delete(s->name, ctx->streams);
-        }
-    }
-
     // if sending, make sure recipients know they're off the send list
     if (c->outgoing) {
-        int i;
         for (i = 0; i < c->outgoing->max_recvs; i++) {
             if (c->outgoing->list[i]) {
-                client_ctx *listener = get_client(c->outgoing->list[i]->rtmp_handle);
-                assert(listener->incoming == c->outgoing);
-                listener->incoming = NULL;
                 free(c->outgoing->list[i]);
                 c->outgoing->list[i] = NULL;
                 c->outgoing->nb_recvs--;
             }
         }
         assert(!c->outgoing->nb_recvs);
+        rxt_delete(c->outgoing->stream->name, ctx->streams);
+        fprintf(stdout, "Deleted stream %s\n", c->outgoing->stream->name);
+        free(c->outgoing);
+        c->outgoing = NULL;
     }
 
-    // if listening, remove from stream send list
-    if (c->incoming) {
-        int i;
-        for (i = 0; i < c->incoming->max_recvs; i++)
-            if (c->incoming->list[i]->rtmp_handle == &(c->rtmp_handle)) {
-                free(c->incoming->list[i]);
-                c->incoming->list[i] = NULL;
-                c->incoming->nb_recvs--;
-                break;
-            }
+    // if listening, remove from stream send list. VOD indicates listener 
+    for (i = 0; i < RTMP_MAX_STREAMS; i++) {
+        rtmp_stream *s = c->rtmp_handle.streams[i];
+        if (s && VOD == s->type) remove_stream_from_list(c, s->name);
     }
 
     rtmp_free(&c->rtmp_handle);
-    if (c->outgoing) free(c->outgoing);
     ev_io_stop(ctx->loop, &c->read_watcher);
     free(c);
     ctx->connections--;
@@ -226,7 +244,6 @@ static int rd_rtmp_play_cb(rtmp *r, rtmp_stream *s)
         goto play_fail;
     }
     recvs = client->outgoing;
-    listener->incoming = recvs;
     if (!recvs) {
         errstr = "Could not find recvs!\n";
         goto play_fail;
@@ -316,6 +333,7 @@ static void rd_rtmp_delete_cb(rtmp *r, rtmp_stream *s)
     srv_ctx *srv = client->srv;
     if (VOD != s->type)
         rxt_delete(s->name, srv->streams);
+    else remove_stream_from_list(client, s->name);
 }
 
 static void incoming_cb(struct ev_loop *loop, ev_io *io, int revents)
@@ -344,7 +362,7 @@ static void incoming_cb(struct ev_loop *loop, ev_io *io, int revents)
     ctx->connections++;
     client->srv = ctx;
     client->id = ctx->total_cxns++;
-    client->incoming = client->outgoing = NULL;
+    client->outgoing = NULL;
 
     rtmp_init(&client->rtmp_handle);
     client->rtmp_handle.fd = clientfd;
