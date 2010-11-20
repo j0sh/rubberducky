@@ -284,6 +284,10 @@ static void rd_rtmp_read_cb(rtmp *r, rtmp_packet *pkt)
         if (recv->list[i]){
             rtmp *handle = recv->list[i]->rtmp_handle;
             rtmp_stream *s = recv->list[i]->stream;
+            int chunk_id;
+
+            if (0x08 == pkt->msg_type) chunk_id = audio_chunk_id(s->id);
+            else chunk_id = video_chunk_id(s->id);
 
             // for receiver's first packet(s), skip up to keyframe
             if (pkt->msg_type == 0x09 &&
@@ -293,7 +297,7 @@ static void rd_rtmp_read_cb(rtmp *r, rtmp_packet *pkt)
             }
 
             rtmp_packet packet = {
-                .chunk_id  = s->id + 3,      // not too fond of this bit
+                .chunk_id  = chunk_id,
                 .msg_type  = pkt->msg_type,
                 .msg_id    = s->id,          // should always be >=1
                 .timestamp = pkt->timestamp,

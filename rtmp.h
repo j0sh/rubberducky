@@ -117,6 +117,35 @@ typedef struct rtmp {
     int  (*play_cb)(struct rtmp *r, rtmp_stream *s);
 }rtmp;
 
+/*     each stream has 5 channels; the last 2 are unknown.
+       0 and 1 are used for signalling large chunk/channel IDs,
+       while 2 and 3 are used for protocol control.
+
+       stream       chunk id       type
+          1              4            data
+          1              5           audio
+          1              6           video
+          2              9            data
+          2             10           audio
+                ... and so on ...           */
+
+static inline int calc_chunk_id(int stream_id, int type_offset)
+{
+    return (stream_id - 1) * 5 + type_offset;
+}
+static inline int data_chunk_id(int stream_id)
+{
+    return calc_chunk_id(stream_id, 4);
+}
+static inline int audio_chunk_id(int stream_id)
+{
+    return calc_chunk_id(stream_id, 5);
+}
+static inline int video_chunk_id(int stream_id)
+{
+    return calc_chunk_id(stream_id, 6);
+}
+
 void rtmp_init(rtmp *r);
 void rtmp_free(rtmp *r);
 void rtmp_free_stream(rtmp_stream **stream);

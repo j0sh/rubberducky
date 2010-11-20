@@ -209,7 +209,7 @@ static int send_onstatus(rtmp *r, rtmp_stream *s,
 
     foo = pbuf;
     rtmp_packet packet = {
-        .chunk_id = 0x04,
+        .chunk_id = data_chunk_id(s->id),
         .msg_type = 0x14,
         .msg_id = s->id,
         .timestamp = ts,
@@ -302,7 +302,7 @@ static int send_avc_seq(rtmp *r, rtmp_stream *stream)
     uint8_t *body = stream->avc_seq;
     int size = stream->avc_seq_size;
     rtmp_packet packet = {
-        .chunk_id  = 0x04,
+        .chunk_id  = data_chunk_id(stream->id),
         .msg_id    = stream->id,
         .msg_type  = 0x09,
         .timestamp = 0,
@@ -318,7 +318,7 @@ static int send_aac_seq(rtmp *r, rtmp_stream *stream)
     uint8_t *body = stream->aac_seq;
     int size = stream->aac_seq_size;
     rtmp_packet packet = {
-        .chunk_id  = 0x04,
+        .chunk_id  = audio_chunk_id(stream->id),
         .msg_id    = stream->id,
         .msg_type  = 0x08,
         .timestamp = 0,
@@ -334,7 +334,7 @@ static int send_metadata(rtmp *r, rtmp_stream *stream)
     uint8_t *body = stream->metadata;
     int size = stream->metadata_size;
     rtmp_packet packet = {
-        .chunk_id = 0x04,
+        .chunk_id = data_chunk_id(stream->id),
         .msg_id = stream->id,
         .msg_type = 0x12,
         .timestamp = 0,
