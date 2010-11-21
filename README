@@ -1,11 +1,16 @@
-Rubberducky: the videoapi mediaserver.
+Rubberducky, yet another RTMP media server.
 
 Requires libev, librtmp, and openssl.
+
+This acts as a stream reflector. Publish a stream in the format
+    rtmp://localhost/appname/streamname
+and connect some clients to it.
+
 
 The makefile will probably have to be modified locally to suit your needs.
 
 $ make
 $ ./a.out
 
-Connect with your rtmp client of choice. It establishes the cxn but does
-little else after media packets start coming in.
+Most codecs should be able to pass through without trouble, including
+H.264 and AAC, but Linear PCM/uncompressed audio might have problems.
