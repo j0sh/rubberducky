@@ -264,13 +264,13 @@ peerbw_fail:
     return -1;
 }
 
-static void parse_metadata(rtmp *r, rtmp_packet *pkt, int offset)
+static void parse_metadata(rtmp *r, rtmp_stream *stream)
 {
     // only extract the things we care about
     AMFObject metadata, metaobjs;
-    rtmp_stream *stream = r->streams[pkt->msg_id];
-    int len = AMF_Decode(&metadata, (char*)(pkt->body + offset),
-                         (pkt->size - offset), FALSE);
+    // skip over \0x2\0x00\0xaonMetaData
+    int len = AMF_Decode(&metadata, (char*)stream->metadata + 13,
+                         stream->metadata_size - 13, FALSE);
     if (len < 0) {
         fprintf(stderr, "Error decoding metadata!\n");
         return;
@@ -305,7 +305,7 @@ static void handle_notify(rtmp *r, rtmp_packet *pkt)
         memcpy(s->metadata, body + 16, size);
         s->metadata[size] = '\0';
         s->metadata_size = size;
-        parse_metadata(r, pkt, 29 + offset);
+        parse_metadata(r, s);
     } else
         fprintf(stdout, "Unhandled metadata!\n");
 }
