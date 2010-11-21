@@ -131,9 +131,34 @@ static void remove_stream_from_list(client_ctx *client, char *stream_name)
             "Are you sure the client ever belonged to the list?\n");
 }
 
-static void free_client(client_ctx *client)
+static void cleanup_lists(client_ctx *c)
 {
     int i;
+    // if sending, make sure recipients know they're off the send list
+    if (c->outgoing) {
+        for (i = 0; i < c->outgoing->max_recvs; i++) {
+            if (c->outgoing->list[i]) {
+                free(c->outgoing->list[i]);
+                c->outgoing->list[i] = NULL;
+                c->outgoing->nb_recvs--;
+            }
+        }
+        assert(!c->outgoing->nb_recvs);
+        rxt_delete(c->outgoing->stream->name, c->srv->streams);
+        fprintf(stdout, "Deleted stream %s\n", c->outgoing->stream->name);
+        free(c->outgoing);
+        c->outgoing = NULL;
+    }
+
+    // if listening, remove from stream send list. VOD indicates listener 
+    for (i = 0; i < RTMP_MAX_STREAMS; i++) {
+        rtmp_stream *s = c->rtmp_handle.streams[i];
+        if (s && VOD == s->type) remove_stream_from_list(c, s->name);
+    }
+}
+
+static void free_client(client_ctx *client)
+{
     srv_ctx *ctx = client->srv;
     client_ctx *c = ctx->clients, *p = NULL;
     while (c != client) { //TODO get rid of the list
@@ -145,30 +170,7 @@ static void free_client(client_ctx *client)
     else
         p->next = c->next;
 
-    fprintf(stdout, "(%d) Disconnecting\n", c->id);
-
-    // if sending, make sure recipients know they're off the send list
-    if (c->outgoing) {
-        for (i = 0; i < c->outgoing->max_recvs; i++) {
-            if (c->outgoing->list[i]) {
-                free(c->outgoing->list[i]);
-                c->outgoing->list[i] = NULL;
-                c->outgoing->nb_recvs--;
-            }
-        }
-        assert(!c->outgoing->nb_recvs);
-        rxt_delete(c->outgoing->stream->name, ctx->streams);
-        fprintf(stdout, "Deleted stream %s\n", c->outgoing->stream->name);
-        free(c->outgoing);
-        c->outgoing = NULL;
-    }
-
-    // if listening, remove from stream send list. VOD indicates listener 
-    for (i = 0; i < RTMP_MAX_STREAMS; i++) {
-        rtmp_stream *s = c->rtmp_handle.streams[i];
-        if (s && VOD == s->type) remove_stream_from_list(c, s->name);
-    }
-
+    cleanup_lists(c);
     rtmp_free(&c->rtmp_handle);
     ev_io_stop(ctx->loop, &c->read_watcher);
     free(c);
@@ -329,11 +331,7 @@ static void rd_rtmp_read_cb(rtmp *r, rtmp_packet *pkt)
 
 static void rd_rtmp_delete_cb(rtmp *r, rtmp_stream *s)
 {
-    client_ctx *client = get_client(r);
-    srv_ctx *srv = client->srv;
-    if (VOD != s->type)
-        rxt_delete(s->name, srv->streams);
-    else remove_stream_from_list(client, s->name);
+    cleanup_lists(get_client(r));
 }
 
 static void incoming_cb(struct ev_loop *loop, ev_io *io, int revents)
