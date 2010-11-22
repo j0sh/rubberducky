@@ -253,7 +253,7 @@ static int rd_rtmp_play_cb(rtmp *r, rtmp_stream *s)
             }
             map->rtmp_handle = r;
             map->stream = s;
-            r->keyframe_pending = recvs->stream->vcodec == 2; // h263 only
+            //r->keyframe_pending = recvs->stream->vcodec == 2; // h263 only
             recvs->list[i] = map;
             recvs->nb_recvs++;
 
@@ -274,7 +274,7 @@ play_fail:
     return 0;
 }
 
-static int is_keyframe(rtmp *listener, rtmp_packet *pkt)
+static videoapi_unused int is_keyframe(rtmp *listener, rtmp_packet *pkt)
 {
   if (0x10 == (0xf0 & *pkt->body)) {
         // for the very first frame its probably better
@@ -303,11 +303,11 @@ static void rd_rtmp_read_cb(rtmp *r, rtmp_packet *pkt)
             else chunk_id = video_chunk_id(s->id);
 
             // for receiver's first packet(s), skip up to keyframe
-            if (pkt->msg_type == 0x09 &&
+            /*if (pkt->msg_type == 0x09 &&
                 handle->keyframe_pending &&
                 !is_keyframe(handle, pkt)) {
                 return;
-            }
+            }*/
 
             rtmp_packet packet = {
                 .chunk_id  = chunk_id,
