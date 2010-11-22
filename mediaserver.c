@@ -101,17 +101,9 @@ static void remove_stream_from_list(client_ctx *client, char *stream_name)
 {
     rtmp *r = &client->rtmp_handle;
     srv_ctx *srv = client->srv;
-    recv_ctx *stream_source;
+    recv_ctx *stream_source = rxt_get(stream_name, srv->streams);
     int i;
 
-    client_ctx *source_client = rxt_get(stream_name, srv->streams);
-    if (!source_client) {
-        fprintf(stderr, "Could not find client for removing stream %s!\n",
-                stream_name);
-        return;
-    }
-
-    stream_source = source_client->outgoing;
     if (!stream_source) {
         fprintf(stderr, "Could not find %s to remove from send list!\n", stream_name);
         return;
@@ -209,43 +201,45 @@ static void rd_rtmp_close_cb(rtmp *r)
     free_client(get_client(r));
 }
 
-static void rd_rtmp_publish_cb(rtmp *r, rtmp_stream *stream)
+static recv_ctx *make_recvs()
 {
 #define MAX_CLIENTS 10
+    recv_ctx *recvs = malloc(MAX_CLIENTS * sizeof(stream_mapping*) +
+                             sizeof(recv_ctx));
+    if (!recvs) {
+        fprintf(stderr, "Out of memory when mallocing receivers!\n");
+        return NULL; // TODO something drastic
+    }
+    memset(recvs, 0, MAX_CLIENTS * sizeof(stream_mapping*) + sizeof(recv_ctx));
+    recvs->max_recvs = MAX_CLIENTS;
+    recvs->list = (stream_mapping**)(recvs + 1);
+    return recvs;
+#undef MAX_CLIENTS
+}
+
+static void rd_rtmp_publish_cb(rtmp *r, rtmp_stream *stream)
+{
     client_ctx *client;
     recv_ctx *recvs;
     srv_ctx *srv;
 
     client = get_client(r);
-    recvs = malloc(MAX_CLIENTS * sizeof(stream_mapping*) + sizeof(recv_ctx));
     srv = client->srv;
-    if (!recvs) {
-        fprintf(stderr, "Out of memory when mallocing receivers!\n");
-        return; // TODO something drastic
-    }
-    memset(recvs, 0, MAX_CLIENTS * sizeof(stream_mapping*) + sizeof(recv_ctx));
+    recvs = rxt_get(stream->name, srv->streams);
+    if (!recvs && !(recvs = make_recvs())) return;
     recvs->stream = stream;
-    recvs->max_recvs = MAX_CLIENTS;
-    recvs->list = (stream_mapping**)(recvs + 1);
     client->outgoing = recvs;
 
-    rxt_put(stream->name, client, srv->streams);
-#undef MAX_CLIENTS
+    rxt_put(stream->name, recvs, srv->streams);
 }
 
 static int rd_rtmp_play_cb(rtmp *r, rtmp_stream *s)
 {
     client_ctx *listener = get_client(r);
     srv_ctx *srv = listener->srv;
-    client_ctx *client = rxt_get(s->name, srv->streams);
-    recv_ctx *recvs;
+    recv_ctx *recvs = rxt_get(s->name, srv->streams);
     const char *errstr;
     int i;
-    if (!client) {
-        errstr = "Couldn not find client!\n";
-        goto play_fail;
-    }
-    recvs = client->outgoing;
     if (!recvs) {
         errstr = "Could not find recvs!\n";
         goto play_fail;
