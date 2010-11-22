@@ -78,8 +78,8 @@ static int send_cxn_resp(rtmp *rtmp, double txn, int ts)
 {
     rtmp_packet packet;
     uint8_t pbuf[384], *pend = pbuf+sizeof(pbuf), *enc;
-  AMFObject obj;
-  AMFObjectProperty p, op;
+    AMFObject obj;
+    AMFObjectProperty p, op;
 
     packet.chunk_id = 0x03; // control channel
     packet.msg_type = 0x14;
@@ -87,35 +87,35 @@ static int send_cxn_resp(rtmp *rtmp, double txn, int ts)
     packet.timestamp = ts;
     packet.body = enc = pbuf;
 
-  enc = amf_write_str(enc, pend, "_result");
-  enc = amf_write_dbl(enc, pend, txn);
-  *enc++ = AMF_OBJECT;
+    enc = amf_write_str(enc, pend, "_result");
+    enc = amf_write_dbl(enc, pend, txn);
+    *enc++ = AMF_OBJECT;
 
-  enc = amf_write_str_kv(enc, pend, "fmsVer", "FMS/3,5,1,525");
-  enc = amf_write_dbl_kv(enc, pend, "capabilities", 31.0);
-  enc = amf_write_dbl_kv(enc, pend, "mode", 1.0);
-  *enc++ = 0;
-  *enc++ = 0;
-  *enc++ = AMF_OBJECT_END;
+    enc = amf_write_str_kv(enc, pend, "fmsVer", "FMS/3,5,1,525");
+    enc = amf_write_dbl_kv(enc, pend, "capabilities", 31.0);
+    enc = amf_write_dbl_kv(enc, pend, "mode", 1.0);
+    *enc++ = 0;
+    *enc++ = 0;
+    *enc++ = AMF_OBJECT_END;
 
-  *enc++ = AMF_OBJECT;
+    *enc++ = AMF_OBJECT;
 
-  enc = amf_write_str_kv(enc, pend, "level", "status");
-  enc = amf_write_str_kv(enc, pend, "code", "NetConnection.Connect.Success");
-  enc = amf_write_str_kv(enc, pend, "description", "Connection succeeded.");
-  enc = amf_write_dbl_kv(enc, pend, "objectEncoding", rtmp->encoding);
-  STR2AVAL(p.p_name, "version");
-  STR2AVAL(p.p_vu.p_aval, "3,5,1,525");
-  p.p_type = AMF_STRING;
-  obj.o_num = 1;
-  obj.o_props = &p;
-  op.p_type = AMF_OBJECT;  // nested
-  STR2AVAL(op.p_name, "data");
-  op.p_vu.p_object = obj;
-  enc = (uint8_t*)AMFProp_Encode(&op, (char*)enc, (char*)pend);
-  *enc++ = 0;
-  *enc++ = 0;
-  *enc++ = AMF_OBJECT_END;
+    enc = amf_write_str_kv(enc, pend, "level", "status");
+    enc = amf_write_str_kv(enc, pend, "code", "NetConnection.Connect.Success");
+    enc = amf_write_str_kv(enc, pend, "description", "Connection succeeded.");
+    enc = amf_write_dbl_kv(enc, pend, "objectEncoding", rtmp->encoding);
+    STR2AVAL(p.p_name, "version");
+    STR2AVAL(p.p_vu.p_aval, "3,5,1,525");
+    p.p_type = AMF_STRING;
+    obj.o_num = 1;
+    obj.o_props = &p;
+    op.p_type = AMF_OBJECT;  // nested
+    STR2AVAL(op.p_name, "data");
+    op.p_vu.p_object = obj;
+    enc = (uint8_t*)AMFProp_Encode(&op, (char*)enc, (char*)pend);
+    *enc++ = 0;
+    *enc++ = 0;
+    *enc++ = AMF_OBJECT_END;
 
     packet.size = enc - packet.body;
     return rtmp_send(rtmp, &packet);
@@ -222,79 +222,79 @@ static int send_onstatus(rtmp *r, rtmp_stream *s,
 
 static void handle_connect(rtmp *rtmp, rtmp_packet *pkt, AMFObject *obj)
 {
-        AMFObject cobj;
-        AVal pname, pval;
-        int i;
-        AMFProp_GetObject(AMF_GetProp(obj, NULL, 2), &cobj);
-        for(i = 0; i < cobj.o_num; i++)
+    AMFObject cobj;
+    AVal pname, pval;
+    int i;
+    AMFProp_GetObject(AMF_GetProp(obj, NULL, 2), &cobj);
+    for(i = 0; i < cobj.o_num; i++)
+    {
+        pname = cobj.o_props[i].p_name;
+        pval.av_val = NULL;
+        pval.av_len = 0;
+        if(AMF_STRING == cobj.o_props[i].p_type)
         {
-            pname = cobj.o_props[i].p_name;
-            pval.av_val = NULL;
-            pval.av_len = 0;
-            if(AMF_STRING == cobj.o_props[i].p_type)
-            {
-                pval = cobj.o_props[i].p_vu.p_aval;// dammit, ugly
+            pval = cobj.o_props[i].p_vu.p_aval;// dammit, ugly
+        }
+        if(AVMATCH(&pname, &av_app))
+        {
+            char *app = malloc(pval.av_len + 1);
+            if (!app) { // do something drastic!
+                fprintf(stderr, "Out of memory!\n");
             }
-            if(AVMATCH(&pname, &av_app))
-            {
-                char *app = malloc(pval.av_len + 1);
-                if (!app) { // do something drastic!
-                    fprintf(stderr, "Out of memory!\n");
-                }
-                strncpy(app, pval.av_val, pval.av_len);
-                app[pval.av_len] = '\0'; // pval may not be nulled
+            strncpy(app, pval.av_val, pval.av_len);
+            app[pval.av_len] = '\0'; // pval may not be nulled
                 rtmp->app = app;
                 fprintf(stdout, "app: %s\n", rtmp->app);
                 pval.av_val = NULL;
-            } else if(AVMATCH(&pname, &av_flashVer))
-            {
-                //rtmp->Link.flashVer = pval;
-                pval.av_val = NULL;
-            } else if(AVMATCH(&pname, &av_tcUrl))
-            {
-                fprintf(stdout, "tcUrl: %s\n", pval.av_val);
-                rtmp->url = malloc(pval.av_len + 1);
-                if (!rtmp->url) { // TODO something drastic
-                    fprintf(stderr, "Out of memory when allocating tc_url!\n");
-                    return;
-                }
-                strncpy(rtmp->url, pval.av_val, pval.av_len);
-                rtmp->url[pval.av_len] = '\0';
-                pval.av_val = NULL;
-            } else if(AVMATCH(&pname, &av_pageUrl))
-            {
-                //rtmp->Link.pageUrl = pval;
-                pval.av_val = NULL;
-            } else if(AVMATCH(&pname, &av_audioCodecs))
-            {
-                //rtmp->m_fAudioCodecs = cobj.o_props[i].p_vu.p_number;
-            } else if(AVMATCH(&pname, &av_videoCodecs))
-            {
-                //rtmp->m_fVideoCodecs = cobj.o_props[i].p_vu.p_number;
-            } else if(AVMATCH(&pname, &av_objectEncoding))
-            {
-                switch((int)cobj.o_props[i].p_vu.p_number) {
-                case AMF0:
-                    rtmp->encoding = AMF0;
-                    break;
-                case AMF3:
-                    rtmp->encoding = AMF3;
-                    break;
-                default:
-                    fprintf(stderr, "Unknown AMF encoding %d\n",
-                            (int)cobj.o_props[i].p_vu.p_number);
-                    return; // XXX do something drastic; close cxn?
-                }
-                fprintf(stderr, "object encoding: AMF%d\n",
-                        rtmp->encoding);
+        } else if(AVMATCH(&pname, &av_flashVer))
+        {
+            //rtmp->Link.flashVer = pval;
+            pval.av_val = NULL;
+        } else if(AVMATCH(&pname, &av_tcUrl))
+        {
+            fprintf(stdout, "tcUrl: %s\n", pval.av_val);
+            rtmp->url = malloc(pval.av_len + 1);
+            if (!rtmp->url) { // TODO something drastic
+                fprintf(stderr, "Out of memory when allocating tc_url!\n");
+                return;
             }
-            // unrecognized string
-            if(pval.av_val)
-            {
-                // do something? log?
+            strncpy(rtmp->url, pval.av_val, pval.av_len);
+            rtmp->url[pval.av_len] = '\0';
+            pval.av_val = NULL;
+        } else if(AVMATCH(&pname, &av_pageUrl))
+        {
+            //rtmp->Link.pageUrl = pval;
+            pval.av_val = NULL;
+        } else if(AVMATCH(&pname, &av_audioCodecs))
+        {
+            //rtmp->m_fAudioCodecs = cobj.o_props[i].p_vu.p_number;
+        } else if(AVMATCH(&pname, &av_videoCodecs))
+        {
+            //rtmp->m_fVideoCodecs = cobj.o_props[i].p_vu.p_number;
+        } else if(AVMATCH(&pname, &av_objectEncoding))
+        {
+            switch((int)cobj.o_props[i].p_vu.p_number) {
+            case AMF0:
+                rtmp->encoding = AMF0;
+                break;
+            case AMF3:
+                rtmp->encoding = AMF3;
+                break;
+            default:
+                fprintf(stderr, "Unknown AMF encoding %d\n",
+                        (int)cobj.o_props[i].p_vu.p_number);
+                return; // XXX do something drastic; close cxn?
             }
-            //rtmp->m_bSendCounter = FALSE; // for sending bytes received message
+            fprintf(stderr, "object encoding: AMF%d\n",
+                    rtmp->encoding);
         }
+        // unrecognized string
+        if(pval.av_val)
+        {
+            // do something? log?
+        }
+        //rtmp->m_bSendCounter = FALSE; // for sending bytes received message
+    }
 }
 
 static int send_avc_seq(rtmp *r, rtmp_stream *stream)
@@ -487,16 +487,14 @@ static void handle_invoke(rtmp *r, rtmp_packet *pkt)
         streamname[val.av_len] = '\0';
         stream->name = streamname;
 
-        if (r->play_cb && !r->play_cb(r, stream))
-            return;
+        if (r->play_cb && !r->play_cb(r, stream)) return;
 
         // send allll the messages flash player requires
         send_chunksize(r, 1400, ts++); // close to MTU
         // XXX send streamisrecorded usercontrol message (????)
         send_stream_begin(r, stream->id, ts++);
         send_onstatus(r, stream, PLAY, ts++);
-        if (reset)
-            send_onstatus(r, stream, RESET, ts++);
+        if (reset) send_onstatus(r, stream, RESET, ts++);
         if (stream->metadata) send_metadata(r, stream);
         if (stream->aac_seq) send_aac_seq(r, stream);
         if (stream->avc_seq) send_avc_seq(r, stream);

@@ -51,25 +51,25 @@ static videoapi_unused unsigned int
 get_dh_offset(uint8_t *handshake, unsigned int len,
               int initial_offset, int second_offset)
 {
-  unsigned int offset = 0;
-  uint8_t *ptr = handshake + initial_offset;
+    unsigned int offset = 0;
+    uint8_t *ptr = handshake + initial_offset;
 
-  offset += (*ptr);
-  ptr++;
-  offset += (*ptr);
-  ptr++;
-  offset += (*ptr);
-  ptr++;
-  offset += (*ptr);
+    offset += (*ptr);
+    ptr++;
+    offset += (*ptr);
+    ptr++;
+    offset += (*ptr);
+    ptr++;
+    offset += (*ptr);
 
-  offset = (offset % 632) + second_offset;
+    offset = (offset % 632) + second_offset;
 
-  if (offset + 128 > (initial_offset - 1)) {
-    fprintf(stderr, "Couldn't calculate correct DH offset (got %d), "
-                     "exiting!", offset);
-    //TODO close cxn here
-  }
-  return offset;
+    if (offset + 128 > (initial_offset - 1)) {
+        fprintf(stderr, "Couldn't calculate correct DH offset (got %d), "
+                         "exiting!", offset);
+        //TODO close cxn here
+    }
+    return offset;
 }
 
 static int get_digest_offset(uint8_t *b, int initial_offset)
@@ -208,66 +208,66 @@ static int init_handshake(rtmp *r)
         return RTMPERR(EAGAIN);
     }
 
-        *b++ = version;  // copy version given by client
-        uptime = htonl(get_uptime());
-        memcpy(b, &uptime, 4); // timestamp
-        b += 4;
+    *b++ = version;  // copy version given by client
+    uptime = htonl(get_uptime());
+    memcpy(b, &uptime, 4); // timestamp
+    b += 4;
 
-        // server version. FP9 only
-        *b++ = FMS_VER_MAJOR;
-        *b++ = FMS_VER_MINOR;
-        *b++ = FMS_VER_MICRO;
-        *b++ = FMS_VER_NANO;
+    // server version. FP9 only
+    *b++ = FMS_VER_MAJOR;
+    *b++ = FMS_VER_MINOR;
+    *b++ = FMS_VER_MICRO;
+    *b++ = FMS_VER_NANO;
 
-        // random bytes to complete the handshake
-        bi = (int*)b;
-        for (i = 2; i < RTMP_SIG_SIZE/4; i++)
-            *bi++ = rand();
-        b = out->body+1;
+    // random bytes to complete the handshake
+    bi = (int*)b;
+    for (i = 2; i < RTMP_SIG_SIZE/4; i++)
+        *bi++ = rand();
+    b = out->body+1;
 
-        if (p[4]) {
-            // imprint key
-            r->off = get_digest_offset(b, digest_offset_values[0]);
-            calc_digest(r->off, b, genuine_fms_key, 36, b+r->off);
-        } else
-            r->off = 0;
+    if (p[4]) {
+        // imprint key
+        r->off = get_digest_offset(b, digest_offset_values[0]);
+        calc_digest(r->off, b, genuine_fms_key, 36, b+r->off);
+    } else
+        r->off = 0;
 
-        send(r->fd, out->body, (bend - out->body), 0);
-        r->tx += bend - out->body;
+    send(r->fd, out->body, (bend - out->body), 0);
+    r->tx += bend - out->body;
 
-        // decode client request
-        memcpy(&uptime, p, 4);
-        uptime = ntohl(uptime);
-        fprintf(stdout, "client uptime: %d\n", uptime);
-        fprintf(stdout, "player version: %d.%d.%d.%d\n", p[4], p[5], p[6], p[7]);
+    // decode client request
+    memcpy(&uptime, p, 4);
+    uptime = ntohl(uptime);
+    fprintf(stdout, "client uptime: %d\n", uptime);
+    fprintf(stdout, "player version: %d.%d.%d.%d\n", p[4], p[5], p[6], p[7]);
 
-        // only if this is a Flash Player 9+ handshake
-        // FP9 handshakes are only if major player version is >0
-        if (r->off) {
-            uint8_t the_digest[SHA256_DIGEST_LENGTH];
-            int off;
-            if (!(off = verify_digest(p, genuine_fp_key, 30, 0))) {
-                fprintf(stderr, "client digest failed\n");
-                return RTMPERR(INVALIDDATA);
-            }
-
-            if ((pe - p) != RTMP_SIG_SIZE) {
-                fprintf(stderr, "Client buffer not big enough\n");
-                return RTMPERR(INVALIDDATA);
-            }
-
-            // imprint server signature into client response
-            signature = p+RTMP_SIG_SIZE-SHA256_DIGEST_LENGTH;
-            hmac(&p[off], SHA256_DIGEST_LENGTH, genuine_fms_key,
-                       sizeof(genuine_fms_key), the_digest);
-            hmac(p, RTMP_SIG_SIZE - SHA256_DIGEST_LENGTH, the_digest,
-                       SHA256_DIGEST_LENGTH, signature);
+    // only if this is a Flash Player 9+ handshake
+    // FP9 handshakes are only if major player version is >0
+    if (r->off) {
+        uint8_t the_digest[SHA256_DIGEST_LENGTH];
+        int off;
+        if (!(off = verify_digest(p, genuine_fp_key, 30, 0))) {
+            fprintf(stderr, "client digest failed\n");
+            return RTMPERR(INVALIDDATA);
         }
-        send(r->fd, p, RTMP_SIG_SIZE, 0);
-        r->tx += RTMP_SIG_SIZE;
-        pkt->read = 0; // this bookkeping sucks. fix.
-        return 1;
+
+        if ((pe - p) != RTMP_SIG_SIZE) {
+            fprintf(stderr, "Client buffer not big enough\n");
+            return RTMPERR(INVALIDDATA);
+        }
+
+        // imprint server signature into client response
+        signature = p+RTMP_SIG_SIZE-SHA256_DIGEST_LENGTH;
+        hmac(&p[off], SHA256_DIGEST_LENGTH, genuine_fms_key,
+                   sizeof(genuine_fms_key), the_digest);
+        hmac(p, RTMP_SIG_SIZE - SHA256_DIGEST_LENGTH, the_digest,
+                   SHA256_DIGEST_LENGTH, signature);
     }
+    send(r->fd, p, RTMP_SIG_SIZE, 0);
+    r->tx += RTMP_SIG_SIZE;
+    pkt->read = 0; // this bookkeping sucks. fix.
+    return 1;
+}
 
 static int handshake2(ev_io *io)
 {
@@ -288,42 +288,40 @@ static int handshake2(ev_io *io)
     pkt->read += len;
     pe  = p + pkt->read;
 
-        // second part of the handshake.
-        if ((pe - p) < RTMP_SIG_SIZE) {
-        return RTMPERR(EAGAIN);
-        }
+    // second part of the handshake.
+    if ((pe - p) < RTMP_SIG_SIZE) return RTMPERR(EAGAIN);
 
 #if 0
-        // FP9 only
-        if (r->off) {
-            uint8_t signature[SHA256_DIGEST_LENGTH];
-            uint8_t thedigest[SHA256_DIGEST_LENGTH];
-            uint8_t *b = out->body+1;
-            // verify client response
-            hmac(&b[r->off], SHA256_DIGEST_LENGTH, genuine_fp_key,
-                 sizeof(genuine_fp_key), thedigest);
-            hmac(p, RTMP_SIG_SIZE - SHA256_DIGEST_LENGTH, thedigest,
-                 SHA256_DIGEST_LENGTH, signature);
-            if (memcmp(signature, &p[RTMP_SIG_SIZE - SHA256_DIGEST_LENGTH],
-                       SHA256_DIGEST_LENGTH)) {
-                fprintf(stderr, "Client not genuine Adobe\n");
-                return RTMPERR(INVALIDDATA);
-            }
+    // FP9 only
+    if (r->off) {
+        uint8_t signature[SHA256_DIGEST_LENGTH];
+        uint8_t thedigest[SHA256_DIGEST_LENGTH];
+        uint8_t *b = out->body+1;
+        // verify client response
+        hmac(&b[r->off], SHA256_DIGEST_LENGTH, genuine_fp_key,
+             sizeof(genuine_fp_key), thedigest);
+        hmac(p, RTMP_SIG_SIZE - SHA256_DIGEST_LENGTH, thedigest,
+             SHA256_DIGEST_LENGTH, signature);
+        if (memcmp(signature, &p[RTMP_SIG_SIZE - SHA256_DIGEST_LENGTH],
+                   SHA256_DIGEST_LENGTH)) {
+            fprintf(stderr, "Client not genuine Adobe\n");
+            return RTMPERR(INVALIDDATA);
         }
-        // we should verify the bytes returned match in pre-fp9 handshakes
-        // but: Postel's Law.
+    }
+    // we should verify the bytes returned match in pre-fp9 handshakes
+    // but: Postel's Law.
 #endif
 
-        fprintf(stdout, "Great success: client handshake successful!\n");
-        free(pkt->body);
-        pkt->body = NULL;
-        r->in_channels[pkt->chunk_id] = NULL;
-        free(pkt);
-        free(out->body);
-        out->body = NULL;
-        r->out_channels[out->chunk_id] = NULL;
-        free(out);
-        return 1;
-    }
+    fprintf(stdout, "Great success: client handshake successful!\n");
+    free(pkt->body);
+    pkt->body = NULL;
+    r->in_channels[pkt->chunk_id] = NULL;
+    free(pkt);
+    free(out->body);
+    out->body = NULL;
+    r->out_channels[out->chunk_id] = NULL;
+    free(out);
+    return 1;
+}
 
 #endif

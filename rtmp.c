@@ -249,8 +249,7 @@ control_error:
 static int handle_setpeerbw(rtmp *r, rtmp_packet *pkt)
 {
     int ack;
-    if (pkt->size < 4)
-        goto peerbw_fail;
+    if (pkt->size < 4) goto peerbw_fail;
     ack = amf_read_i32(pkt->body);
     if (ack != r->ack_size) {
         r->ack_size = ack;

@@ -264,13 +264,13 @@ static int rd_rtmp_play_cb(rtmp *r, rtmp_stream *s)
             recvs->nb_recvs++;
 
             if (recvs->stream) {
-            // don't particularly like this bit of copying. better way?
-            s->metadata = recvs->stream->metadata;
-            s->metadata_size = recvs->stream->metadata_size;
-            s->aac_seq = recvs->stream->aac_seq;
-            s->aac_seq_size = recvs->stream->aac_seq_size;
-            s->avc_seq = recvs->stream->avc_seq;
-            s->avc_seq_size = recvs->stream->avc_seq_size;
+                // don't particularly like this bit of copying.
+                s->metadata = recvs->stream->metadata;
+                s->metadata_size = recvs->stream->metadata_size;
+                s->aac_seq = recvs->stream->aac_seq;
+                s->aac_seq_size = recvs->stream->aac_seq_size;
+                s->avc_seq = recvs->stream->avc_seq;
+                s->avc_seq_size = recvs->stream->avc_seq_size;
             }
             return 1;
         }
