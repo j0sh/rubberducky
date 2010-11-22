@@ -226,11 +226,13 @@ static void rd_rtmp_publish_cb(rtmp *r, rtmp_stream *stream)
     client = get_client(r);
     srv = client->srv;
     recvs = rxt_get(stream->name, srv->streams);
-    if (!recvs && !(recvs = make_recvs())) return;
+    if (!recvs) {
+        recvs = make_recvs();
+        if (recvs) rxt_put(stream->name, recvs, srv->streams);
+        else return;
+    }
     recvs->stream = stream;
     client->outgoing = recvs;
-
-    rxt_put(stream->name, recvs, srv->streams);
 }
 
 static int rd_rtmp_play_cb(rtmp *r, rtmp_stream *s)
@@ -241,8 +243,12 @@ static int rd_rtmp_play_cb(rtmp *r, rtmp_stream *s)
     const char *errstr;
     int i;
     if (!recvs) {
-        errstr = "Could not find recvs!\n";
-        goto play_fail;
+        if (!(recvs = make_recvs())) {
+            errstr = "Out of memory for recvs in play_cb!\n";
+            goto play_fail;
+        }
+        recvs->stream = NULL;
+        rxt_put(s->name, recvs, srv->streams);
     }
     for (i = 0; i < recvs->max_recvs; i++)
         if (!recvs->list[i]) {
@@ -257,6 +263,7 @@ static int rd_rtmp_play_cb(rtmp *r, rtmp_stream *s)
             recvs->list[i] = map;
             recvs->nb_recvs++;
 
+            if (recvs->stream) {
             // don't particularly like this bit of copying. better way?
             s->metadata = recvs->stream->metadata;
             s->metadata_size = recvs->stream->metadata_size;
@@ -264,6 +271,7 @@ static int rd_rtmp_play_cb(rtmp *r, rtmp_stream *s)
             s->aac_seq_size = recvs->stream->aac_seq_size;
             s->avc_seq = recvs->stream->avc_seq;
             s->avc_seq_size = recvs->stream->avc_seq_size;
+            }
             return 1;
         }
 
@@ -287,7 +295,11 @@ static videoapi_unused int is_keyframe(rtmp *listener, rtmp_packet *pkt)
 
 static void rd_rtmp_read_cb(rtmp *r, rtmp_packet *pkt)
 {
-    if (pkt->msg_type == 0x08 || pkt->msg_type == 0x09) {
+    switch (pkt->msg_type) {
+    case 0x08:
+    case 0x09:
+    case 0x0f:
+    case 0x12: {
     client_ctx *client = get_client(r);
     recv_ctx *recv = client->outgoing;
     int i, j;
@@ -297,10 +309,20 @@ static void rd_rtmp_read_cb(rtmp *r, rtmp_packet *pkt)
         if (recv->list[i]){
             rtmp *handle = recv->list[i]->rtmp_handle;
             rtmp_stream *s = recv->list[i]->stream;
-            int chunk_id;
+            uint8_t *body = pkt->body;
+            int chunk_id, size = pkt->size;
 
-            if (0x08 == pkt->msg_type) chunk_id = audio_chunk_id(s->id);
-            else chunk_id = video_chunk_id(s->id);
+            switch(pkt->msg_type) {
+            case 0x08: chunk_id = audio_chunk_id(s->id); break;
+            case 0x09: chunk_id = video_chunk_id(s->id); break;
+            case 0x0f:
+            case 0x12:
+                chunk_id = data_chunk_id(s->id);
+                if (!memcmp("\x02\x00\x0d@setDataFrame", pkt->body, 16)) {
+                    body = pkt->body + 16;
+                    size = pkt->size - 16;
+                }
+            }
 
             // for receiver's first packet(s), skip up to keyframe
             /*if (pkt->msg_type == 0x09 &&
@@ -314,12 +336,13 @@ static void rd_rtmp_read_cb(rtmp *r, rtmp_packet *pkt)
                 .msg_type  = pkt->msg_type,
                 .msg_id    = s->id,          // should always be >=1
                 .timestamp = pkt->timestamp,
-                .body      = pkt->body,
-                .size      = pkt->size
+                .body      = body,
+                .size      = size
             };
             rtmp_send(handle, &packet);
             j++;
         }
+    }
     }
 }
 
