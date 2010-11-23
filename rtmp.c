@@ -25,11 +25,6 @@ static uint32_t get_uptime()
     return times(&t) * 1000 / clk_tck;
 }
 
-static inline rtmp* get_rtmp(ev_io *w)
-{
-    return (rtmp*)w->data;
-}
-
 static int send_chunksize(rtmp *r, int chunksize, int ts)
 {
     uint8_t pbuf[4];
@@ -356,7 +351,7 @@ static void handle_video(rtmp *r, rtmp_packet *pkt)
     }
 }
 
-static int handle_msg(rtmp *r, struct rtmp_packet *pkt, ev_io *io)
+static int handle_msg(rtmp *r, struct rtmp_packet *pkt)
 {
     switch (pkt->msg_type) {
     case 0x01: // set chunk size
@@ -405,9 +400,8 @@ static uint32_t read_i32_le(uint8_t *c)
     return (c[3] << 24) | (c[2] << 16) | (c[1] << 8) | c[0];
 }
 
-static int process_packet(ev_io *io)
+static int process_packet(rtmp *r)
 {
-    rtmp *r = get_rtmp(io);
     int header_type, chunk_id, chunk_size, to_increment = 0, copy_header = 0;
     rtmp_packet *pkt = r->prev_pkt;
     uint8_t *p, *pe;
@@ -587,7 +581,7 @@ static int process_packet(ev_io *io)
                         "chunksize",   chunk_size);
     */
     if (pkt->read == pkt->size) {
-        handle_msg(r, pkt, io);
+        handle_msg(r, pkt);
         pkt->read = 0;
     }
     return 1;
@@ -596,22 +590,21 @@ parse_pkt_fail:
     return RTMPERR(EAGAIN);
 }
 
-void rtmp_read(struct ev_loop *loop, ev_io *io, int revents)
+void rtmp_read(rtmp *r)
 {
-    rtmp *r = get_rtmp(io);
     int bytes_read;
 
     switch (r->state) {
     case UNINIT:
-        bytes_read = init_handshake(get_rtmp(io));
+        bytes_read = init_handshake(r);
         if (1 == bytes_read) r->state = HANDSHAKE;
         break;
     case HANDSHAKE:
-        bytes_read = handshake2(io);
+        bytes_read = handshake2(r);
         if (1 == bytes_read) r->state = READ;
         break;
     case READ:
-        bytes_read = process_packet(io);
+        bytes_read = process_packet(r);
         break;
     }
     if (bytes_read <= 0 && bytes_read != RTMPERR(EAGAIN)) goto read_error;

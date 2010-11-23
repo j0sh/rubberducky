@@ -269,9 +269,8 @@ static int init_handshake(rtmp *r)
     return 1;
 }
 
-static int handshake2(ev_io *io)
+static int handshake2(rtmp *r)
 {
-    rtmp *r = get_rtmp(io);
     int len, read_size;
     rtmp_packet *pkt = r->in_channels[0], *out = r->out_channels[0];
     uint8_t *p = pkt->body, *pe;

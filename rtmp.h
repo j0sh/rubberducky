@@ -149,7 +149,7 @@ static inline int video_chunk_id(int stream_id)
 void rtmp_init(rtmp *r);
 void rtmp_free(rtmp *r);
 void rtmp_free_stream(rtmp_stream **stream);
-void rtmp_read(struct ev_loop *loop, ev_io *io, int revents);
+void rtmp_read(rtmp *r);
 int  rtmp_send(rtmp *r, struct rtmp_packet *pkt);
 
 #endif

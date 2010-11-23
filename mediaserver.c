@@ -351,6 +351,11 @@ static void rd_rtmp_delete_cb(rtmp *r, rtmp_stream *s)
     cleanup_lists(get_client(r));
 }
 
+static void read_cb(struct ev_loop *loop, ev_io *io, int revents)
+{
+    rtmp_read(io->data);
+}
+
 static void incoming_cb(struct ev_loop *loop, ev_io *io, int revents)
 {
     int clientfd;
@@ -391,7 +396,7 @@ static void incoming_cb(struct ev_loop *loop, ev_io *io, int revents)
     fcntl(clientfd, F_SETFL, O_NONBLOCK);
 
     /* setup the events */
-    ev_io_init(&client->read_watcher, rtmp_read, client->rtmp_handle.fd, EV_READ);
+    ev_io_init(&client->read_watcher, read_cb, client->rtmp_handle.fd, EV_READ);
     ev_io_start(ctx->loop, &client->read_watcher);
 
     // we can convert this to a readable hostname later
