@@ -114,6 +114,9 @@ static void remove_stream_from_list(client_ctx *client, char *stream_name)
             free(stream_source->list[i]); // free the mapping
             stream_source->list[i] = NULL;
             stream_source->nb_recvs--;
+            // if the stream will dangle, remove it
+            if (!(stream_source->stream || stream_source->nb_recvs))
+                rxt_delete(stream_source->stream->name, srv->streams);
             fprintf(stdout, "Removed %s from send list.\n", stream_name);
             return;
         }
@@ -126,18 +129,10 @@ static void remove_stream_from_list(client_ctx *client, char *stream_name)
 static void cleanup_lists(client_ctx *c)
 {
     int i;
-    // if sending, make sure recipients know they're off the send list
-    if (c->outgoing) {
-        for (i = 0; i < c->outgoing->max_recvs; i++) {
-            if (c->outgoing->list[i]) {
-                free(c->outgoing->list[i]);
-                c->outgoing->list[i] = NULL;
-                c->outgoing->nb_recvs--;
-            }
-        }
-        assert(!c->outgoing->nb_recvs);
-        rxt_delete(c->outgoing->stream->name, c->srv->streams);
+    // don't remove stream from routing table if listeners still exist
+    if (c->outgoing && !c->outgoing->nb_recvs) {
         fprintf(stdout, "Deleted stream %s\n", c->outgoing->stream->name);
+        rxt_delete(c->outgoing->stream->name, c->srv->streams);
         free(c->outgoing);
         c->outgoing = NULL;
     }
