@@ -110,14 +110,22 @@ static void remove_stream_from_list(client_ctx *client, char *stream_name)
     }
 
     for (i = 0; i < stream_source->max_recvs; i++) {
-        if (stream_source->list[i]->rtmp_handle == r) {
+        if (stream_source->list[i] &&
+            stream_source->list[i]->rtmp_handle == r) {
             free(stream_source->list[i]); // free the mapping
             stream_source->list[i] = NULL;
             stream_source->nb_recvs--;
             // if the stream will dangle, remove it
-            if (!(stream_source->stream || stream_source->nb_recvs))
-                rxt_delete(stream_source->stream->name, srv->streams);
-            fprintf(stdout, "Removed %s from send list.\n", stream_name);
+            if (!(stream_source->stream || stream_source->nb_recvs)) {
+                client_ctx *src = rxt_delete(stream_name, srv->streams);
+                if (!src) {
+                    fprintf(stderr, "Warning: stream  %s did not exist "
+                            "in routing table\n", stream_name);
+                    return;
+                }
+                printf("removing stream %s\n", stream_name);
+                free(src);
+            }
             return;
         }
     }
@@ -126,16 +134,21 @@ static void remove_stream_from_list(client_ctx *client, char *stream_name)
             "Are you sure the client ever belonged to the list?\n");
 }
 
-static void cleanup_lists(client_ctx *c)
+static void cleanup_outgoing(client_ctx *c)
 {
-    int i;
     // don't remove stream from routing table if listeners still exist
     if (c->outgoing && !c->outgoing->nb_recvs) {
-        fprintf(stdout, "Deleted stream %s\n", c->outgoing->stream->name);
-        rxt_delete(c->outgoing->stream->name, c->srv->streams);
+        assert(c->outgoing == rxt_delete(c->outgoing->stream->name,
+                                         c->srv->streams));
         free(c->outgoing);
         c->outgoing = NULL;
     }
+}
+
+static void cleanup_lists(client_ctx *c)
+{
+    int i;
+    cleanup_outgoing(c);
 
     // if listening, remove from stream send list. VOD indicates listener 
     for (i = 0; i < RTMP_MAX_STREAMS; i++) {
@@ -158,6 +171,7 @@ static void free_client(client_ctx *client)
         p->next = c->next;
 
     cleanup_lists(c);
+    if (c->outgoing){ free(c->outgoing); c->outgoing = NULL; }
     rtmp_free(&c->rtmp_handle);
     ev_io_stop(ctx->loop, &c->read_watcher);
     free(c);
@@ -343,7 +357,8 @@ static void rd_rtmp_read_cb(rtmp *r, rtmp_packet *pkt)
 
 static void rd_rtmp_delete_cb(rtmp *r, rtmp_stream *s)
 {
-    cleanup_lists(get_client(r));
+    if (VOD == s->type) remove_stream_from_list(get_client(r), s->name);
+    else cleanup_outgoing(get_client(r));
 }
 
 static void read_cb(struct ev_loop *loop, ev_io *io, int revents)
