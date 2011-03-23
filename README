@@ -10,7 +10,7 @@ and connect some clients to it.
 The makefile will probably have to be modified locally to suit your needs.
 
 $ make
-$ ./a.out
+$ ./rubberducky
 
 Most codecs should be able to pass through without trouble, including
 H.264 and AAC, but Linear PCM/uncompressed audio might have problems.
