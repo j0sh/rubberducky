@@ -150,7 +150,7 @@ static void cleanup_lists(client_ctx *c)
     int i;
     cleanup_outgoing(c);
 
-    // if listening, remove from stream send list. VOD indicates listener 
+    // if listening, remove from stream send list. VOD indicates listener
     for (i = 0; i < RTMP_MAX_STREAMS; i++) {
         rtmp_stream *s = c->rtmp_handle.streams[i];
         if (s && VOD == s->type) remove_stream_from_list(c, s->name);
@@ -330,6 +330,8 @@ static void rd_rtmp_read_cb(rtmp *r, rtmp_packet *pkt)
                 if (!memcmp("\x02\x00\x0d@setDataFrame", pkt->body, 16)) {
                     body = pkt->body + 16;
                     size = pkt->size - 16;
+                    fprintf(stderr, "%d 0x12 sent %s\n", pkt->timestamp,
+                            body+3);
                 }
             }
 
