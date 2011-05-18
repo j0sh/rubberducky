@@ -68,7 +68,8 @@ static int setup_socket(const char *hostname, int port)
     addr.sin_port = htons(port);
     setsockopt(sockfd, SOL_SOCKET, SO_REUSEADDR, &tmp, sizeof(tmp));
 
-    if (resolve_host(&addr, HOSTNAME, QUOTEVALUE(RTMP_PORT))) {
+
+    if (resolve_host(&addr, hostname, QUOTEVALUE(RTMP_PORT))) {
         errstr = "Failed to resolve host";
         goto fail;
     }
@@ -83,7 +84,7 @@ static int setup_socket(const char *hostname, int port)
         goto fail;
     }
 
-    fprintf(stdout, "Starting server at %s:%d\n", HOSTNAME, RTMP_PORT);
+    fprintf(stdout, "Starting server at %s:%d\n", hostname, RTMP_PORT);
     return sockfd;
 
 fail:
@@ -458,10 +459,12 @@ static void setup_events(srv_ctx *ctx)
 int main(int argc, char** argv)
 {
     int serverfd = 0;
-    const char *errstr;
+    const char *errstr, *hostname = HOSTNAME;
     srv_ctx *ctx = malloc(sizeof(srv_ctx));
 
-    if ((serverfd = setup_socket(HOSTNAME, RTMP_PORT)) < 0) {
+    if (argc > 1) hostname = argv[1];
+
+    if ((serverfd = setup_socket(hostname, RTMP_PORT)) < 0) {
         serverfd = 0;
         errstr = "Failed to set up socket";
         goto fail;
