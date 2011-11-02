@@ -44,7 +44,7 @@ static int resolve_host(struct sockaddr_in *addr,
         /* only do ipv4 for now */
         for (cur = res; cur; cur = cur->ai_next) {
             if (cur->ai_family == AF_INET) {
-                addr->sin_addr = ((struct sockaddr_in *)cur->ai_addr)->sin_addr;
+                memcpy(addr, cur->ai_addr, sizeof(struct sockaddr_in));
                 break;
             }
         }
@@ -68,7 +68,8 @@ static int setup_socket(const char *hostname, int port)
     addr.sin_port = htons(port);
     setsockopt(sockfd, SOL_SOCKET, SO_REUSEADDR, &tmp, sizeof(tmp));
 
-    if (resolve_host(&addr, HOSTNAME, QUOTEVALUE(RTMP_PORT))) {
+
+    if (resolve_host(&addr, hostname, QUOTEVALUE(RTMP_PORT))) {
         errstr = "Failed to resolve host";
         goto fail;
     }
@@ -83,7 +84,7 @@ static int setup_socket(const char *hostname, int port)
         goto fail;
     }
 
-    fprintf(stdout, "Starting server at %s:%d\n", HOSTNAME, RTMP_PORT);
+    fprintf(stdout, "Starting server at %s:%d\n", hostname, RTMP_PORT);
     return sockfd;
 
 fail:
@@ -150,7 +151,7 @@ static void cleanup_lists(client_ctx *c)
     int i;
     cleanup_outgoing(c);
 
-    // if listening, remove from stream send list. VOD indicates listener 
+    // if listening, remove from stream send list. VOD indicates listener
     for (i = 0; i < RTMP_MAX_STREAMS; i++) {
         rtmp_stream *s = c->rtmp_handle.streams[i];
         if (s && VOD == s->type) remove_stream_from_list(c, s->name);
@@ -330,6 +331,8 @@ static void rd_rtmp_read_cb(rtmp *r, rtmp_packet *pkt)
                 if (!memcmp("\x02\x00\x0d@setDataFrame", pkt->body, 16)) {
                     body = pkt->body + 16;
                     size = pkt->size - 16;
+                    fprintf(stderr, "%d 0x12 sent %s\n", pkt->timestamp,
+                            body+3);
                 }
             }
 
@@ -456,10 +459,12 @@ static void setup_events(srv_ctx *ctx)
 int main(int argc, char** argv)
 {
     int serverfd = 0;
-    const char *errstr;
+    const char *errstr, *hostname = HOSTNAME;
     srv_ctx *ctx = malloc(sizeof(srv_ctx));
 
-    if ((serverfd = setup_socket(HOSTNAME, RTMP_PORT)) < 0) {
+    if (argc > 1) hostname = argv[1];
+
+    if ((serverfd = setup_socket(hostname, RTMP_PORT)) < 0) {
         serverfd = 0;
         errstr = "Failed to set up socket";
         goto fail;
