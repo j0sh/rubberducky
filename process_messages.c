@@ -127,6 +127,9 @@ static int send_fcpublish(rtmp *rtmp, const char *streamname,
 {
     uint8_t pbuf[256], *end = pbuf+sizeof(pbuf), *enc = pbuf, *foo;
     const char *key, *value;
+
+    if (!streamname) return -1;
+
     switch (action) {
     case PUBLISH:
         key = "onFCPublish";
@@ -345,7 +348,7 @@ static int send_metadata(rtmp *r, rtmp_stream *stream)
     return rtmp_send(r, &packet);
 }
 
-static void handle_invoke(rtmp *r, rtmp_packet *pkt)
+void handle_invoke(rtmp *r, rtmp_packet *pkt)
 {
     uint8_t *body = pkt->body;
     int pkt_len = pkt->size;
