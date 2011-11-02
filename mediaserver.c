@@ -44,7 +44,7 @@ static int resolve_host(struct sockaddr_in *addr,
         /* only do ipv4 for now */
         for (cur = res; cur; cur = cur->ai_next) {
             if (cur->ai_family == AF_INET) {
-                addr->sin_addr = ((struct sockaddr_in *)cur->ai_addr)->sin_addr;
+                memcpy(addr, cur->ai_addr, sizeof(struct sockaddr_in));
                 break;
             }
         }
